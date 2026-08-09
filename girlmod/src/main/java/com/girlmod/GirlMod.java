@@ -1,10 +1,12 @@
 package com.girlmod;
 
 import com.girlmod.client.renderer.GirlRenderer;
+import com.girlmod.config.StateConfig;
 import com.girlmod.entity.GirlEntity;
 import com.girlmod.init.ModEntities;
 import com.girlmod.init.ModSounds;
 import com.girlmod.network.PacketHandler;
+import com.girlmod.sound.SoundMapper;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.Commands;
@@ -50,6 +52,12 @@ public class GirlMod {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         PacketHandler.register();
+        // Load config files after the event queue settles — avoids doing file
+        // I/O directly on the parallel mod-loading thread pool.
+        event.enqueueWork(() -> {
+            StateConfig.load();
+            SoundMapper.load();
+        });
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -100,6 +108,23 @@ public class GirlMod {
                     );
                     return 1;
                 })
+        );
+
+        dispatcher.register(
+            Commands.literal("girlmod")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.literal("reload")
+                    .executes(ctx -> {
+                        StateConfig.reload();
+                        SoundMapper.reload();
+                        ctx.getSource().sendSuccess(
+                            new StringTextComponent(TextFormatting.GREEN
+                                + "[GirlMod] Reloaded states.json and sound_mappings.json from config/girlmod/"),
+                            true
+                        );
+                        return 1;
+                    })
+                )
         );
     }
 }

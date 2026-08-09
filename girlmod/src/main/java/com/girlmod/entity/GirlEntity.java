@@ -1,5 +1,7 @@
 package com.girlmod.entity;
 
+import com.girlmod.config.StateConfig;
+import com.girlmod.config.StateDefinition;
 import com.girlmod.sound.SoundMapper;
 import net.minecraft.entity.CreatureEntity;
 import net.minecraft.entity.EntityType;
@@ -30,7 +32,16 @@ import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
+/**
+ * State is now a plain String id (e.g. "HUG", "COWGIRL_SLOW") looked up
+ * against StateConfig, which loads its definitions from
+ * config/girlmod/states.json at runtime. This means adding/editing
+ * animation states no longer requires touching this class or recompiling
+ * the mod — see StateConfig.java and DEVELOPMENT.md for details.
+ */
 public class GirlEntity extends CreatureEntity implements IAnimatable {
+
+    public static final String DEFAULT_STATE_ID = "IDLE";
 
     private static final DataParameter<String> STATE =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
@@ -38,7 +49,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     private final AnimationFactory factory = new AnimationFactory(this);
 
     @OnlyIn(Dist.CLIENT)
-    private AnimState lastRenderedState;
+    private String lastRenderedStateId;
 
     private int animTicksInState  = 0;
     private int animDurationTicks = 0;
@@ -48,12 +59,16 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.maxUpStep = 0.6f;
     }
 
+    // ── Attributes ────────────────────────────────────────────────────────────
+
     public static AttributeModifierMap.MutableAttribute createAttributes() {
         return CreatureEntity.createLivingAttributes()
             .add(Attributes.MAX_HEALTH,     20.0)
             .add(Attributes.MOVEMENT_SPEED,  0.25)
             .add(Attributes.FOLLOW_RANGE,   16.0);
     }
+
+    // ── AI ────────────────────────────────────────────────────────────────────
 
     @Override
     protected void registerGoals() {
@@ -64,10 +79,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     /** True when the current animation should freeze movement/wandering. */
     public boolean isBusy() {
-        return getAnimState().locksMovement;
+        return getStateDef().locksMovement;
     }
 
-    /** Wander goal that only runs while not mid-animation. */
     private static class WanderIfIdleGoal extends RandomWalkingGoal {
         private final GirlEntity girl;
         WanderIfIdleGoal(GirlEntity girl, double speed) {
@@ -78,7 +92,6 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         @Override public boolean canContinueToUse() { return !girl.isBusy() && super.canContinueToUse(); }
     }
 
-    /** Look-at goal that only runs while not mid-animation (avoids fighting the manual face-player snap). */
     private static class LookAtIfIdleGoal extends LookAtGoal {
         private final GirlEntity girl;
         LookAtIfIdleGoal(GirlEntity girl, Class<PlayerEntity> target, float range) {
@@ -89,10 +102,12 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         @Override public boolean canContinueToUse() { return !girl.isBusy() && super.canContinueToUse(); }
     }
 
+    // ── Data ──────────────────────────────────────────────────────────────────
+
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(STATE, AnimState.IDLE.name());
+        this.entityData.define(STATE, DEFAULT_STATE_ID);
     }
 
     @Override
@@ -100,6 +115,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     @Override
     public boolean isInvulnerableTo(DamageSource source) { return true; }
+
+    // ── Interaction ───────────────────────────────────────────────────────────
 
     @Override
     protected ActionResultType mobInteract(PlayerEntity player, Hand hand) {
@@ -111,16 +128,20 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         return ActionResultType.sidedSuccess(this.level.isClientSide);
     }
 
-    public void setState(AnimState state) {
-        this.entityData.set(STATE, state.name());
-        this.animTicksInState  = 0;
-        this.animDurationTicks = state.durationTicks;
+    // ── State ─────────────────────────────────────────────────────────────────
 
-        if (state.locksMovement) {
+    /** Set state by id (e.g. "HUG"). Unknown ids fall back to IDLE via StateConfig.get(). */
+    public void setState(String stateId) {
+        StateDefinition def = StateConfig.get(stateId);
+        this.entityData.set(STATE, def.id); // use the resolved id, so bad input becomes "IDLE" consistently
+        this.animTicksInState  = 0;
+        this.animDurationTicks = def.durationTicks;
+
+        if (def.locksMovement) {
             this.getNavigation().stop(); // cancel any in-progress wander path immediately
         }
 
-        if (state.hasPlayer) {
+        if (def.hasPlayer) {
             PlayerEntity nearest = this.level.getNearestPlayer(this, 8.0);
             if (nearest != null) {
                 double dx = nearest.getX() - this.getX();
@@ -132,13 +153,15 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         }
     }
 
-    public AnimState getAnimState() {
-        try {
-            return AnimState.valueOf(this.entityData.get(STATE));
-        } catch (IllegalArgumentException e) {
-            return AnimState.IDLE;
-        }
+    public String getStateId() {
+        return this.entityData.get(STATE);
     }
+
+    public StateDefinition getStateDef() {
+        return StateConfig.get(getStateId());
+    }
+
+    // ── Tick ──────────────────────────────────────────────────────────────────
 
     @Override
     public void tick() {
@@ -147,30 +170,33 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
             if (isBusy()) {
                 this.getNavigation().stop(); // belt-and-braces: never let her drift while busy
             }
-            AnimState current = getAnimState();
-            if (current.loopType == AnimState.LoopType.PLAY_ONCE && current.followUp != null) {
+            StateDefinition current = getStateDef();
+            if (current.loopType == StateDefinition.LoopType.PLAY_ONCE && current.followUpId != null) {
                 animTicksInState++;
                 if (animTicksInState >= animDurationTicks && animDurationTicks > 0) {
-                    setState(current.followUp);
+                    setState(current.followUpId);
                 }
             }
         }
     }
 
+    // ── NBT ───────────────────────────────────────────────────────────────────
+
     @Override
     public void addAdditionalSaveData(CompoundNBT nbt) {
         super.addAdditionalSaveData(nbt);
-        nbt.putString("GirlState", getAnimState().name());
+        nbt.putString("GirlState", getStateId());
     }
 
     @Override
     public void readAdditionalSaveData(CompoundNBT nbt) {
         super.readAdditionalSaveData(nbt);
         if (nbt.contains("GirlState")) {
-            try { setState(AnimState.valueOf(nbt.getString("GirlState"))); }
-            catch (IllegalArgumentException e) { setState(AnimState.IDLE); }
+            setState(nbt.getString("GirlState")); // setState() already falls back to IDLE for unknown ids
         }
     }
+
+    // ── GeckoLib ──────────────────────────────────────────────────────────────
 
     @Override
     public void registerControllers(AnimationData data) {
@@ -184,20 +210,20 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     public AnimationFactory getFactory() { return factory; }
 
     private <E extends IAnimatable> PlayState animationPredicate(AnimationEvent<E> event) {
-        AnimState state = getAnimState();
-        if (this.level.isClientSide && state != lastRenderedState) {
-            lastRenderedState = state;
-            event.getController().setAnimation(buildAnimation(state));
+        String stateId = getStateId();
+        if (this.level.isClientSide && !stateId.equals(lastRenderedStateId)) {
+            lastRenderedStateId = stateId;
+            event.getController().setAnimation(buildAnimation(StateConfig.get(stateId)));
         }
         return PlayState.CONTINUE;
     }
 
-    private AnimationBuilder buildAnimation(AnimState state) {
+    private AnimationBuilder buildAnimation(StateDefinition def) {
         AnimationBuilder builder = new AnimationBuilder();
-        switch (state.loopType) {
-            case LOOP:               builder.addAnimation(state.animName, true);  break;
-            case HOLD_ON_LAST_FRAME: builder.addAnimation(state.animName, false); break;
-            case PLAY_ONCE: default: builder.addAnimation(state.animName, false); break;
+        switch (def.loopType) {
+            case LOOP:               builder.addAnimation(def.animName, true);  break;
+            case HOLD_ON_LAST_FRAME: builder.addAnimation(def.animName, false); break;
+            case PLAY_ONCE: default: builder.addAnimation(def.animName, false); break;
         }
         return builder;
     }

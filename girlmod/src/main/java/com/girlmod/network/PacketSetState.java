@@ -1,6 +1,5 @@
 package com.girlmod.network;
 
-import com.girlmod.entity.AnimState;
 import com.girlmod.entity.GirlEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.ServerPlayerEntity;
@@ -12,54 +11,35 @@ import java.util.function.Supplier;
 
 /**
  * Sent client → server when a player picks an animation from the GUI.
- *
- * 1.16.5 network change from 1.12.2:
- *   - SimpleNetworkWrapper → SimpleChannel
- *   - IMessage / IMessageHandler → encode/decode/handle static methods
- *   - onMessage context gives a Supplier<NetworkEvent.Context> instead of MessageContext
- *
- * Server validates:
- *   - Entity exists and is a GirlEntity
- *   - Sending player is within 10 blocks
- * Then calls entity.setState(state).
+ * stateId is a plain String (e.g. "HUG") looked up against StateConfig
+ * server-side — no enum involved, so new states added via states.json
+ * work immediately without any packet/network code changes.
  */
 public class PacketSetState {
 
-    private final int       entityId;
-    private final String    stateName;
+    private final int    entityId;
+    private final String stateId;
 
-    public PacketSetState(int entityId, AnimState state) {
-        this.entityId  = entityId;
-        this.stateName = state.name();
+    public PacketSetState(int entityId, String stateId) {
+        this.entityId = entityId;
+        this.stateId  = stateId;
     }
-
-    // ── Serialisation ─────────────────────────────────────────────────────────
 
     public static void encode(PacketSetState msg, PacketBuffer buf) {
         buf.writeInt(msg.entityId);
-        buf.writeUtf(msg.stateName, 64);
+        buf.writeUtf(msg.stateId, 64);
     }
 
     public static PacketSetState decode(PacketBuffer buf) {
-        int    entityId  = buf.readInt();
-        String stateName = buf.readUtf(64);
-        // Reuse the two-arg constructor via a temporary AnimState
-        AnimState state;
-        try {
-            state = AnimState.valueOf(stateName);
-        } catch (IllegalArgumentException e) {
-            state = AnimState.IDLE;
-        }
-        return new PacketSetState(entityId, state);
+        int entityId = buf.readInt();
+        String stateId = buf.readUtf(64);
+        return new PacketSetState(entityId, stateId);
     }
-
-    // ── Server-side handler ───────────────────────────────────────────────────
 
     public static void handle(PacketSetState msg, Supplier<NetworkEvent.Context> ctxSupplier) {
         NetworkEvent.Context ctx = ctxSupplier.get();
         ctx.setPacketHandled(true);
 
-        // enqueueWork schedules onto the server thread (packet arrives on netty thread)
         ctx.enqueueWork(() -> {
             ServerPlayerEntity player = ctx.getSender();
             if (player == null) return;
@@ -73,14 +53,7 @@ public class PacketSetState {
             // Distance check — player must be within 10 blocks
             if (player.distanceToSqr(girl) > 100.0) return;
 
-            AnimState state;
-            try {
-                state = AnimState.valueOf(msg.stateName);
-            } catch (IllegalArgumentException e) {
-                return;
-            }
-
-            girl.setState(state);
+            girl.setState(msg.stateId); // setState() validates/falls back internally
         });
     }
 }

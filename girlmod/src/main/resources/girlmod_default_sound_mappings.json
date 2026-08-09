@@ -1,0 +1,51 @@
+{
+  "mappings": {
+    "lipsound":  "girl.lipsound",
+    "pound":     "misc.pounding",
+    "cum":       "misc.inserts",
+    "bedRustle": "misc.bedrustle",
+
+    "hugMSG2":         "girl.giggle",
+    "hugMSG3":         "girl.mmm",
+    "hugMSG4":         "girl.happyoh",
+    "hugMSG5":         "girl.lightbreathing",
+    "hugselectedMSG1": "girl.giggle",
+    "hugselectedMSG2": "girl.mmm",
+
+    "sitdownMSG1": "girl.sigh",
+    "stripMSG1":   "girl.hmph",
+
+    "cowgirlStartMSG0": "girl.mommyhorny",
+    "cowgirlStartMSG1": "girl.lightbreathing",
+    "cowgirlStartMSG2": "girl.moan",
+
+    "cowgirlcumMSG1": "girl.moan",
+    "cowgirlcumMSG2": "girl.ahh",
+    "cowgirlcumMSG3": "girl.heavybreathing",
+    "cowgirlcumMSG4": "girl.ahh",
+    "cowgirlcumMSG5": "girl.moan",
+    "cowgirlcumMSG6": "girl.aftersessionmoan",
+
+    "cowgirlfastMSG1":     "girl.mmm",
+    "missionary_fastMSG1": "girl.moan",
+    "missionary_slowMSG1": "girl.lightbreathing",
+    "missionary_cumMSG1":  "girl.ahh",
+    "missionary_cumMSG2":  "girl.aftersessionmoan",
+
+    "carry_introMSG1": "girl.happyoh",
+    "carry_introMSG2": "girl.mommyhorny",
+    "dashMSG1":        "girl.huh"
+  },
+
+  "nonSoundEffects": [
+    "becomeNude", "stripDone", "startStrip",
+    "cowgirlStartDone", "cowgirlcumDone", "cowgirlfastDone", "cowgirlfastdomDone",
+    "missionary_startDone", "missionary_cumDone", "missionary_fastDone",
+    "carry_introDone", "carry_slowDone", "carry_fastDone", "carry_cumDone",
+    "carry_introCam", "carry_introCam2",
+    "hugDone", "sitdownDone", "dashDone", "dashReady",
+    "attackDone", "attackSound",
+    "openSexUi", "sexUI", "blackScreen",
+    "pearl", "cowgirlfastReady", "missionary_fastReady"
+  ]
+}
