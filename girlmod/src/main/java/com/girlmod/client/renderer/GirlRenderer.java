@@ -10,6 +10,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import software.bernie.geckolib3.core.processor.IBone;
+import software.bernie.geckolib3.model.AnimatedGeoModel;
 import software.bernie.geckolib3.renderers.geo.GeoEntityRenderer;
 
 import java.util.Arrays;
@@ -68,10 +69,15 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
 
         boolean showArmor = entity.isArmored();
 
+        // getGeoModelProvider() is statically typed to the bare GeoModelProvider<T>
+        // base class, which has no animation-related methods at all — the actual
+        // runtime object (the GirlModel passed to super() in the constructor above)
+        // is an AnimatedGeoModel, which is where getAnimationProcessor() actually lives.
+        @SuppressWarnings("unchecked")
+        AnimatedGeoModel<GirlEntity> animatedModel = (AnimatedGeoModel<GirlEntity>) this.getGeoModelProvider();
+
         for (String boneName : ARMOR_BONES) {
-            IBone bone = this.getGeoModelProvider()
-                             .getAnimationProcessor()
-                             .getBone(boneName);
+            IBone bone = animatedModel.getAnimationProcessor().getBone(boneName);
             if (bone == null) continue;
 
             if (showArmor) {
