@@ -51,7 +51,6 @@ import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Random;
 
 /**
@@ -312,22 +311,24 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         }
     }
 
+    /** Substring matched against StateDefinition.animName to find poses to reuse for a mob encounter — see applyMobIdentity(). */
+    private static final String MOB_ENCOUNTER_ANIM_KEYWORD = "start";
+
     /**
-     * Adopts a mob's identity for the duration of the downed sequence:
-     * the partner-rig texture switches to textures/player/<mobName>.png
-     * if that file exists (falls back to the default player skin
-     * otherwise — see GirlModel), and if any states.json entries have an
-     * id starting with the mob's registry name (e.g. a "goblin" mob
-     * matches states like "GOBLIN_A"), one of them is picked at random
-     * instead of the generic DOWNED animation. Add such states yourself
-     * per mob type you want special-cased — nothing else needs to change
-     * in code for a new one.
+     * Adopts a mob's identity for the duration of the downed sequence: the
+     * partner-rig texture switches to textures/player/<mobName>.png if
+     * that file exists (falls back to the default player skin otherwise —
+     * see GirlModel), and one of the existing "start" poses (COWGIRL_START,
+     * MISSIONARY_START, ...) is picked at random to reuse instead of the
+     * generic DOWNED animation, if any exist. No new states/animations
+     * are required per mob type — only a matching player-skin PNG if you
+     * want her to actually look like that mob during the scene.
      */
     private void applyMobIdentity(MonsterEntity mob) {
         String key = registryKeyOf(mob);
         setPartnerSkinKey(key);
 
-        List<String> matches = StateConfig.getIdsStartingWith(key.toUpperCase(Locale.ROOT));
+        List<String> matches = StateConfig.getIdsWithAnimationContaining(MOB_ENCOUNTER_ANIM_KEYWORD);
         if (matches.isEmpty()) {
             if (!getStateId().equals("DOWNED")) setState("DOWNED");
             return;
@@ -500,7 +501,13 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
                 if (downedTicks >= DOWNED_RECOVERY_TICKS) {
                     recoverFromDowned();
                 }
-                return; // skip the normal IDLE/WALK auto-switch etc. below while downed
+                // Deliberately NOT returning here — the followUp/duration
+                // block below still needs to run so a mob-triggered pose
+                // like COWGIRL_START can progress into its COWGIRL_SLOW
+                // followUp instead of freezing on its last frame. The
+                // IDLE/WALK auto-switch further down is a no-op in this
+                // branch anyway since DOWNED and any mob-encounter pose
+                // are never IDLE or WALK.
             }
 
             StateDefinition current = getStateDef();

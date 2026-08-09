@@ -89,6 +89,13 @@ public class StateConfig {
                 System.out.println("[GirlMod] WARNING: states.json has no 'IDLE' state defined. "
                     + "This is used as the fallback for unknown/invalid states — things may break.");
             }
+            if (!loaded.containsKey("DOWNED")) {
+                System.out.println("[GirlMod] WARNING: states.json has no 'DOWNED' state defined. "
+                    + "The invincible downed/recovery sequence (see GirlEntity#hurt) will silently "
+                    + "fall back to IDLE instead of playing animation.ellie.downed. Add a 'DOWNED' "
+                    + "entry (see the bundled girlmod_default_states.json for the exact fields) or "
+                    + "delete your states.json to regenerate the shipped defaults.");
+            }
 
             STATES.clear();
             STATES.putAll(loaded);
@@ -130,18 +137,20 @@ public class StateConfig {
     }
 
     /**
-     * All state ids that start with the given prefix (case-sensitive —
-     * pass an already-uppercased prefix). Used to find mob-specific
-     * interaction states, e.g. prefix "ZOMBIE" matches "ZOMBIE_A",
-     * "ZOMBIE_GRAB", etc. Add such states to states.json yourself with
-     * whatever animation/geo content you want triggered when that mob
-     * type is nearby while she's downed — nothing needs to be added in
-     * code for a new mob, only in the config.
+     * All state ids whose *animation name* contains the given substring
+     * (case-insensitive) — e.g. "start" matches COWGIRL_START
+     * (animation.ellie.cowgirlstart) and MISSIONARY_START
+     * (animation.ellie.missionary_start). Used to pick a random existing
+     * pose to reuse for a mob encounter rather than requiring dedicated
+     * per-mob animations/states.
      */
-    public static List<String> getIdsStartingWith(String prefix) {
+    public static List<String> getIdsWithAnimationContaining(String substring) {
         List<String> result = new ArrayList<>();
-        for (String id : STATES.keySet()) {
-            if (id.startsWith(prefix)) result.add(id);
+        String needle = substring.toLowerCase(Locale.ROOT);
+        for (StateDefinition def : STATES.values()) {
+            if (def.animName != null && def.animName.toLowerCase(Locale.ROOT).contains(needle)) {
+                result.add(def.id);
+            }
         }
         return result;
     }
