@@ -1,5 +1,6 @@
 package com.girlmod.sound;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.util.ResourceLocation;
@@ -51,8 +52,9 @@ public class SoundMapper {
             JsonObject root = new JsonParser().parse(json).getAsJsonObject();
 
             JsonObject mappings = root.getAsJsonObject("mappings");
-            for (String effect : mappings.keySet()) {
-                loadedMap.put(effect, mappings.get(effect).getAsString());
+            // entrySet() rather than keySet() — see StateConfig.java for why.
+            for (Map.Entry<String, JsonElement> entry : mappings.entrySet()) {
+                loadedMap.put(entry.getKey(), entry.getValue().getAsString());
             }
 
             if (root.has("nonSoundEffects")) {

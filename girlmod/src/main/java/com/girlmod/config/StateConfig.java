@@ -1,5 +1,6 @@
 package com.girlmod.config;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraftforge.fml.loading.FMLPaths;
@@ -44,8 +45,12 @@ public class StateConfig {
             JsonObject root = new JsonParser().parse(json).getAsJsonObject();
             JsonObject states = root.getAsJsonObject("states");
 
-            for (String id : states.keySet()) {
-                JsonObject s = states.getAsJsonObject(id);
+            // entrySet() rather than keySet() — MC 1.16.5's bundled Gson 2.8.0
+            // doesn't have JsonObject.keySet() at all (added in a later Gson
+            // version). entrySet() has existed since Gson's earliest releases.
+            for (Map.Entry<String, JsonElement> entry : states.entrySet()) {
+                String id = entry.getKey();
+                JsonObject s = entry.getValue().getAsJsonObject();
 
                 String animName   = s.get("animation").getAsString();
                 String loopStr     = s.get("loopType").getAsString();
