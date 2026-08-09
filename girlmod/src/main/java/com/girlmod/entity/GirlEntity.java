@@ -91,8 +91,16 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     // Combat goal instances — kept as fields so reassessWeaponGoal() can
     // swap which one is active in the goalSelector without recreating them.
-    private final MeleeAttackGoal meleeGoalRaw = new MeleeAttackGoal(this, 1.2, true);
-    private final CustomBowAttackGoal bowGoalRaw = new CustomBowAttackGoal(this, 1.0, 20, 15.0F);
+    // NOT initialized here via field initializer: registerGoals() is called
+    // by the superclass constructor (super(type, world) below), which runs
+    // BEFORE any of this class's own field initializers execute. A field
+    // initializer here would still be null the first time registerGoals()
+    // needs it, causing a NullPointerException on every construction —
+    // including deserializing a previously-saved girl from disk, which
+    // is why she'd silently vanish from existing saves. Created instead
+    // inside registerGoals() itself, see below.
+    private MeleeAttackGoal meleeGoalRaw;
+    private CustomBowAttackGoal bowGoalRaw;
     private Goal currentWeaponGoal; // the currently-added IdleGatedGoal wrapper, so we can remove it before swapping
 
     public GirlEntity(EntityType<? extends GirlEntity> type, World world) {
@@ -114,6 +122,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     @Override
     protected void registerGoals() {
+        this.meleeGoalRaw = new MeleeAttackGoal(this, 1.2, true);
+        this.bowGoalRaw   = new CustomBowAttackGoal(this, 1.0, 20, 15.0F);
+
         this.goalSelector.addGoal(0, new SwimGoal(this));
         this.goalSelector.addGoal(1, new IdleGatedGoal(this, new FollowPlayerGoal(this, 1.15)));
         this.goalSelector.addGoal(1, new IdleGatedGoal(this, new RandomWalkingGoal(this, 1.0)));
