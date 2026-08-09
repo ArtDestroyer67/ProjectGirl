@@ -53,6 +53,12 @@ public class PacketSetState {
             // Distance check — player must be within 10 blocks
             if (player.distanceToSqr(girl) > 100.0) return;
 
+            // While downed/recovering, the state is driven entirely by the
+            // downed sequence itself (generic DOWNED clip or a mob-matched
+            // one — see GirlEntity#applyMobIdentity/tick), so a pose picked
+            // from the GUI mid-recovery is ignored rather than interrupting it.
+            if (girl.isDowned()) return;
+
             girl.setState(msg.stateId); // setState() validates/falls back internally
         });
     }

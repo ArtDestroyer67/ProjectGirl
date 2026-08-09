@@ -1,10 +1,14 @@
 package com.girlmod.client.model;
 
 import com.girlmod.entity.GirlEntity;
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import software.bernie.geckolib3.model.AnimatedGeoModel;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * GeoModel for GirlEntity.
@@ -40,6 +44,12 @@ public class GirlModel extends AnimatedGeoModel<GirlEntity> {
     private static final ResourceLocation ANIM =
         new ResourceLocation("girlmod", "animations/girl/girl.animation.json");
 
+    // Resolved textures/player/<mobName>.png -> whether that file actually
+    // exists, cached so we're not hitting the resource manager every frame.
+    // Cleared on resource reload (F3+T / resource pack switch) so newly
+    // added mob skin files get picked up without a restart.
+    private static final Map<String, ResourceLocation> PARTNER_SKIN_CACHE = new HashMap<>();
+
     /**
      * Set by GirlRenderer immediately before each of its two render passes
      * (see GirlRenderer#render). GeckoLib only binds one texture per
@@ -60,7 +70,24 @@ public class GirlModel extends AnimatedGeoModel<GirlEntity> {
 
     @Override
     public ResourceLocation getTextureLocation(GirlEntity entity) {
-        return renderingPartnerPass ? TEX_PLAYER : TEX_GIRL;
+        if (!renderingPartnerPass) return TEX_GIRL;
+        return resolvePartnerTexture(entity.getPartnerSkinKey());
+    }
+
+    /**
+     * Picks textures/player/<key>.png if it exists (e.g. key "zombie" ->
+     * a zombie-skinned partner rig during a zombie-triggered downed
+     * animation — see GirlEntity#applyMobIdentity), otherwise falls back
+     * to the default player/steve.png. key is "" whenever no mob identity
+     * is currently applied (normal player-sync poses).
+     */
+    private static ResourceLocation resolvePartnerTexture(String key) {
+        if (key == null || key.isEmpty()) return TEX_PLAYER;
+        return PARTNER_SKIN_CACHE.computeIfAbsent(key, k -> {
+            ResourceLocation candidate = new ResourceLocation("girlmod", "textures/player/" + k + ".png");
+            boolean exists = Minecraft.getInstance().getResourceManager().hasResource(candidate);
+            return exists ? candidate : TEX_PLAYER;
+        });
     }
 
     @Override

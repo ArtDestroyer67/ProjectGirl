@@ -33,12 +33,14 @@ import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.ActionResultType;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.Hand;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.SoundEvents;
 import net.minecraft.world.World;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib3.core.IAnimatable;
 import software.bernie.geckolib3.core.PlayState;
 import software.bernie.geckolib3.core.builder.AnimationBuilder;
@@ -48,6 +50,8 @@ import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
 /**
@@ -83,6 +87,22 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> PARTNER_FORCED =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
+    private static final DataParameter<Boolean> DOWNED =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
+    // "" = no mob identity currently applied (default steve.png partner texture).
+    // Otherwise the ForgeRegistries.ENTITIES path of whichever mob most
+    // recently downed her / is nearby while she's downed, e.g. "zombie".
+    private static final DataParameter<String> PARTNER_SKIN_KEY =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
+
+    /** How long the downed/invincible recovery lasts before she's back to full health. */
+    private static final int DOWNED_RECOVERY_TICKS = 100; // 5 seconds
+    /** Radius used both to find a mob to "blame" for a downed sequence and to re-check for one each second while downed. */
+    private static final double MOB_INTERACT_RADIUS = 6.0;
+    /** Radius within which hostile mobs get un-targeted from her while she's busy (animation playing). */
+    private static final double MOB_IGNORE_RADIUS = 12.0;
+
+    private int downedTicks = 0;
 
     private final AnimationFactory factory = new AnimationFactory(this);
     private final Random random = new Random();
@@ -186,13 +206,15 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.entityData.define(DRESSED, false);
         this.entityData.define(ARMORED, false);
         this.entityData.define(PARTNER_FORCED, false);
+        this.entityData.define(DOWNED, false);
+        this.entityData.define(PARTNER_SKIN_KEY, "");
     }
 
     @Override
     public boolean removeWhenFarAway(double dist) { return false; }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) { return true; }
+    public boolean isInvulnerableTo(DamageSource source) { return isDowned(); }
 
     // ── Following ─────────────────────────────────────────────────────────────
 
@@ -235,6 +257,123 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public void setPartnerForced(boolean forced) {
         this.entityData.set(PARTNER_FORCED, forced);
+    }
+
+    // ── Downed / HP system ───────────────────────────────────────────────────
+
+    /** True while she's on the invincible "downed" recovery sequence (see hurt() below). */
+    public boolean isDowned() { return this.entityData.get(DOWNED); }
+
+    private void setDowned(boolean downed) { this.entityData.set(DOWNED, downed); }
+
+    /** Registry path (e.g. "zombie") of whichever mob's identity the partner rig is currently wearing, or "" for the default player skin. */
+    public String getPartnerSkinKey() { return this.entityData.get(PARTNER_SKIN_KEY); }
+
+    private void setPartnerSkinKey(String key) { this.entityData.set(PARTNER_SKIN_KEY, key == null ? "" : key); }
+
+    /**
+     * Intercepts what would otherwise be a killing blow: instead of dying,
+     * she's put into the invincible DOWNED state for DOWNED_RECOVERY_TICKS,
+     * then fully healed and returned to IDLE (see tick()). Damage that
+     * wouldn't be lethal is applied normally via super.hurt() so knockback,
+     * hurt sound/animation, etc. still work as usual.
+     *
+     * She's no longer unconditionally invulnerable (see isInvulnerableTo
+     * above) — that flag now only covers the downed/recovery window itself.
+     */
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        if (this.level.isClientSide) return false;
+        if (isDowned()) return false; // fully invincible mid-recovery
+
+        float prospectiveHealth = this.getHealth() - amount;
+        if (prospectiveHealth <= 0.0F) {
+            triggerDowned(source);
+            return true;
+        }
+        return super.hurt(source, amount);
+    }
+
+    private void triggerDowned(DamageSource source) {
+        this.setHealth(1.0F); // keep her alive at minimal HP through the sequence
+        setDowned(true);
+        downedTicks = 0;
+
+        Entity attacker = source.getEntity();
+        MonsterEntity mob = (attacker instanceof MonsterEntity)
+            ? (MonsterEntity) attacker
+            : findNearestMonster(MOB_INTERACT_RADIUS);
+
+        if (mob != null) {
+            applyMobIdentity(mob);
+        } else {
+            setPartnerSkinKey("");
+            setState("DOWNED");
+        }
+    }
+
+    /**
+     * Adopts a mob's identity for the duration of the downed sequence:
+     * the partner-rig texture switches to textures/player/<mobName>.png
+     * if that file exists (falls back to the default player skin
+     * otherwise — see GirlModel), and if any states.json entries have an
+     * id starting with the mob's registry name (e.g. a "goblin" mob
+     * matches states like "GOBLIN_A"), one of them is picked at random
+     * instead of the generic DOWNED animation. Add such states yourself
+     * per mob type you want special-cased — nothing else needs to change
+     * in code for a new one.
+     */
+    private void applyMobIdentity(MonsterEntity mob) {
+        String key = registryKeyOf(mob);
+        setPartnerSkinKey(key);
+
+        List<String> matches = StateConfig.getIdsStartingWith(key.toUpperCase(Locale.ROOT));
+        if (matches.isEmpty()) {
+            if (!getStateId().equals("DOWNED")) setState("DOWNED");
+            return;
+        }
+        if (!matches.contains(getStateId())) {
+            setState(matches.get(random.nextInt(matches.size())));
+        }
+    }
+
+    private static String registryKeyOf(Entity entity) {
+        ResourceLocation id = ForgeRegistries.ENTITIES.getKey(entity.getType());
+        return id != null ? id.getPath() : "unknown";
+    }
+
+    private MonsterEntity findNearestMonster(double radius) {
+        List<MonsterEntity> nearby =
+            this.level.getEntitiesOfClass(MonsterEntity.class, this.getBoundingBox().inflate(radius));
+        MonsterEntity closest = null;
+        double closestDistSq = Double.MAX_VALUE;
+        for (MonsterEntity m : nearby) {
+            double d = m.distanceToSqr(this);
+            if (d < closestDistSq) {
+                closestDistSq = d;
+                closest = m;
+            }
+        }
+        return closest;
+    }
+
+    /** Un-targets any nearby hostile mob currently targeting her — see tick(). */
+    private void clearHostileTargetsOnMe() {
+        List<MonsterEntity> nearby =
+            this.level.getEntitiesOfClass(MonsterEntity.class, this.getBoundingBox().inflate(MOB_IGNORE_RADIUS));
+        for (MonsterEntity m : nearby) {
+            if (m.getTarget() == this) {
+                m.setTarget(null);
+            }
+        }
+    }
+
+    private void recoverFromDowned() {
+        this.setHealth(this.getMaxHealth()); // full heal, 20 hearts
+        setDowned(false);
+        setPartnerSkinKey("");
+        downedTicks = 0;
+        setState("IDLE");
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
@@ -338,7 +477,32 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         if (!this.level.isClientSide) {
             if (isBusy()) {
                 this.getNavigation().stop(); // belt-and-braces: never let her drift while busy
+                // Task: mobs ignore her while any animation (other than IDLE/WALK)
+                // is playing — checked every 5 ticks rather than every tick to
+                // keep the entity-scan cheap.
+                if (this.tickCount % 5 == 0) {
+                    clearHostileTargetsOnMe();
+                }
             }
+
+            if (isDowned()) {
+                downedTicks++;
+                // Re-check for a nearby mob once a second so a mob that
+                // wanders in after the downed sequence already started
+                // (e.g. she was downed by fall damage, not an attack)
+                // still gets picked up and swaps in its identity/animation.
+                if (downedTicks % 20 == 0) {
+                    MonsterEntity nearby = findNearestMonster(MOB_INTERACT_RADIUS);
+                    if (nearby != null) {
+                        applyMobIdentity(nearby);
+                    }
+                }
+                if (downedTicks >= DOWNED_RECOVERY_TICKS) {
+                    recoverFromDowned();
+                }
+                return; // skip the normal IDLE/WALK auto-switch etc. below while downed
+            }
+
             StateDefinition current = getStateDef();
 
             // Auto-switch between IDLE and WALK based on actual horizontal
@@ -389,6 +553,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         nbt.putBoolean("Dressed", isDressed());
         nbt.putBoolean("Armored", isArmored());
         nbt.putBoolean("PartnerForced", isPartnerForced());
+        nbt.putBoolean("Downed", isDowned());
+        nbt.putInt("DownedTicks", downedTicks);
+        nbt.putString("PartnerSkinKey", getPartnerSkinKey());
     }
 
     @Override
@@ -408,6 +575,15 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         }
         if (nbt.contains("PartnerForced")) {
             setPartnerForced(nbt.getBoolean("PartnerForced"));
+        }
+        if (nbt.contains("Downed")) {
+            setDowned(nbt.getBoolean("Downed"));
+        }
+        if (nbt.contains("DownedTicks")) {
+            downedTicks = nbt.getInt("DownedTicks");
+        }
+        if (nbt.contains("PartnerSkinKey")) {
+            setPartnerSkinKey(nbt.getString("PartnerSkinKey"));
         }
     }
 

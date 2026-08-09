@@ -129,6 +129,23 @@ public class StateConfig {
         return STATES.containsKey(id);
     }
 
+    /**
+     * All state ids that start with the given prefix (case-sensitive —
+     * pass an already-uppercased prefix). Used to find mob-specific
+     * interaction states, e.g. prefix "ZOMBIE" matches "ZOMBIE_A",
+     * "ZOMBIE_GRAB", etc. Add such states to states.json yourself with
+     * whatever animation/geo content you want triggered when that mob
+     * type is nearby while she's downed — nothing needs to be added in
+     * code for a new mob, only in the config.
+     */
+    public static List<String> getIdsStartingWith(String prefix) {
+        List<String> result = new ArrayList<>();
+        for (String id : STATES.keySet()) {
+            if (id.startsWith(prefix)) result.add(id);
+        }
+        return result;
+    }
+
     // ── internals ────────────────────────────────────────────────────────────
 
     private static Path getConfigPath() {

@@ -27,6 +27,8 @@
     "ATTACK0":   { "animation": "animation.ellie.attack0",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
     "ATTACK1":   { "animation": "animation.ellie.attack1",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
     "ATTACK2":   { "animation": "animation.ellie.attack2",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
-    "BOWCHARGE": { "animation": "animation.ellie.bowcharge", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 20, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false }
+    "BOWCHARGE": { "animation": "animation.ellie.bowcharge", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 20, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
+
+    "DOWNED": { "animation": "animation.ellie.downed", "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false }
   }
 }

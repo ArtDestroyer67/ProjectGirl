@@ -87,6 +87,14 @@ public class GuiGirlInteract extends Screen {
         }
 
         // ── Pose buttons, paginated ───────────────────────────────────────
+        // Hidden entirely while downed — the recovery sequence drives her
+        // state itself (see PacketSetState), a picked pose would just be
+        // silently ignored server-side, which is confusing without this.
+        if (entity.isDowned()) {
+            pagesTotal = 1;
+            return;
+        }
+
         List<String> stateIds = StateConfig.getAllIds();
         if (stateIds.isEmpty()) return;
 
@@ -211,6 +219,11 @@ public class GuiGirlInteract extends Screen {
             + (entity.isDressed()   ? (entity.isArmored() ? "  |  Armored" : "  |  No Armor") : "")
             + (entity.isPartnerForced() ? "  |  Partner Forced" : "");
         drawCenteredString(stack, this.font, status, this.width / 2, 22, 0xFFFFFFFF);
+
+        if (entity.isDowned()) {
+            drawCenteredString(stack, this.font, "Downed — recovering...",
+                this.width / 2, STATE_TOP_Y, 0xFFFF5555);
+        }
 
         // Page indicator (only shown when there are multiple pages)
         if (pagesTotal > 1) {
