@@ -58,8 +58,35 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new SwimGoal(this));
-        this.goalSelector.addGoal(1, new RandomWalkingGoal(this, 1.0));
-        this.goalSelector.addGoal(2, new LookAtGoal(this, PlayerEntity.class, 8.0f));
+        this.goalSelector.addGoal(1, new WanderIfIdleGoal(this, 1.0));
+        this.goalSelector.addGoal(2, new LookAtIfIdleGoal(this, PlayerEntity.class, 8.0f));
+    }
+
+    /** True when the current animation should freeze movement/wandering. */
+    public boolean isBusy() {
+        return getAnimState().locksMovement;
+    }
+
+    /** Wander goal that only runs while not mid-animation. */
+    private static class WanderIfIdleGoal extends RandomWalkingGoal {
+        private final GirlEntity girl;
+        WanderIfIdleGoal(GirlEntity girl, double speed) {
+            super(girl, speed);
+            this.girl = girl;
+        }
+        @Override public boolean canUse()           { return !girl.isBusy() && super.canUse(); }
+        @Override public boolean canContinueToUse() { return !girl.isBusy() && super.canContinueToUse(); }
+    }
+
+    /** Look-at goal that only runs while not mid-animation (avoids fighting the manual face-player snap). */
+    private static class LookAtIfIdleGoal extends LookAtGoal {
+        private final GirlEntity girl;
+        LookAtIfIdleGoal(GirlEntity girl, Class<PlayerEntity> target, float range) {
+            super(girl, target, range);
+            this.girl = girl;
+        }
+        @Override public boolean canUse()           { return !girl.isBusy() && super.canUse(); }
+        @Override public boolean canContinueToUse() { return !girl.isBusy() && super.canContinueToUse(); }
     }
 
     @Override
@@ -89,6 +116,10 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.animTicksInState  = 0;
         this.animDurationTicks = state.durationTicks;
 
+        if (state.locksMovement) {
+            this.getNavigation().stop(); // cancel any in-progress wander path immediately
+        }
+
         if (state.hasPlayer) {
             PlayerEntity nearest = this.level.getNearestPlayer(this, 8.0);
             if (nearest != null) {
@@ -113,6 +144,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     public void tick() {
         super.tick();
         if (!this.level.isClientSide) {
+            if (isBusy()) {
+                this.getNavigation().stop(); // belt-and-braces: never let her drift while busy
+            }
             AnimState current = getAnimState();
             if (current.loopType == AnimState.LoopType.PLAY_ONCE && current.followUp != null) {
                 animTicksInState++;

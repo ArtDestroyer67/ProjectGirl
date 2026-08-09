@@ -4,7 +4,14 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '4.1.+', changing: true
+        // PINNED to 4.1.14 (not the floating 4.1.+). The floating latest
+        // 4.1.x had a real Windows bug: MCPRepo.findRenames() writes a
+        // TSRG file without creating its parent folder first, which throws
+        // NoSuchFileException on Windows for both 'official' and 'snapshot'
+        // mapping channels. 4.1.14 does not have this bug. Do not change
+        // this back to a floating version without testing a full Windows
+        // build first — see DEVELOPMENT.md for the full incident writeup.
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '4.1.14', changing: false
     }
 }
 
@@ -20,9 +27,7 @@ java {
 }
 
 minecraft {
-    // Use snapshot mappings — hosted on Forge maven, no Mojang download needed
-    // snapshot_20210309 is the last stable snapshot for 1.16.5
-    mappings channel: 'snapshot', version: '20210309-1.16.5'
+    mappings channel: 'official', version: '1.16.5'
 
     runs {
         client {

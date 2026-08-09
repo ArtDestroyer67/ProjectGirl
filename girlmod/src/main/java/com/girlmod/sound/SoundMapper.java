@@ -6,9 +6,18 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
 
+/**
+ * Maps GeckoLib sound keyframe effect names to registered SoundEvents.
+ *
+ * IMPORTANT: each category (e.g. "girl.lipsound") is registered as ONE
+ * SoundEvent in ModSounds. The multiple .ogg variants for that category
+ * are listed under that single event in sounds.json — Minecraft's own
+ * sound engine picks a random variant at playback time. We must NOT try
+ * to look up numbered sub-IDs like "girl.lipsound3" as separate events;
+ * they were never registered and the lookup silently returns null,
+ * which is why sound was previously not playing at all.
+ */
 public class SoundMapper {
-
-    private static final Random RNG = new Random();
 
     private static final Set<String> NON_SOUND_EFFECTS = new HashSet<>(Arrays.asList(
         "becomeNude", "stripDone", "startStrip",
@@ -22,59 +31,52 @@ public class SoundMapper {
         "pearl", "cowgirlfastReady", "missionary_fastReady"
     ));
 
+    /** Resolve an effect name to the SoundEvent registered for its category. */
     public static SoundEvent resolve(String effectName) {
         if (NON_SOUND_EFFECTS.contains(effectName)) return null;
-        String[] candidates = SOUND_MAP.get(effectName);
-        if (candidates == null) return null;
-        String chosen = candidates[RNG.nextInt(candidates.length)];
-        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("girlmod", chosen));
+        String category = SOUND_MAP.get(effectName);
+        if (category == null) return null;
+        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("girlmod", category));
     }
 
-    private static final Map<String, String[]> SOUND_MAP = new HashMap<>();
+    // ── effect name → registered sound event category (matches sounds.json keys) ──
+    private static final Map<String, String> SOUND_MAP = new HashMap<>();
 
     static {
-        put("lipsound",  range("girl.lipsound",   0, 9));
-        put("pound",     range("misc.pounding",   0, 35));
-        put("cum",       range("misc.inserts",    0, 4));
-        put("bedRustle", range("misc.bedrustle",  0, 1));
+        SOUND_MAP.put("lipsound",  "girl.lipsound");
+        SOUND_MAP.put("pound",     "misc.pounding");
+        SOUND_MAP.put("cum",       "misc.inserts");
+        SOUND_MAP.put("bedRustle", "misc.bedrustle");
 
-        put("hugMSG2",         range("girl.giggle",        0, 4));
-        put("hugMSG3",         range("girl.mmm",           0, 8));
-        put("hugMSG4",         range("girl.happyoh",       0, 2));
-        put("hugMSG5",         range("girl.lightbreathing",0, 7));
-        put("hugselectedMSG1", range("girl.giggle",        0, 4));
-        put("hugselectedMSG2", range("girl.mmm",           0, 8));
+        SOUND_MAP.put("hugMSG2",         "girl.giggle");
+        SOUND_MAP.put("hugMSG3",         "girl.mmm");
+        SOUND_MAP.put("hugMSG4",         "girl.happyoh");
+        SOUND_MAP.put("hugMSG5",         "girl.lightbreathing");
+        SOUND_MAP.put("hugselectedMSG1", "girl.giggle");
+        SOUND_MAP.put("hugselectedMSG2", "girl.mmm");
 
-        put("sitdownMSG1", range("girl.sigh",  0, 1));
-        put("stripMSG1",   range("girl.hmph",  0, 3));
+        SOUND_MAP.put("sitdownMSG1", "girl.sigh");
+        SOUND_MAP.put("stripMSG1",   "girl.hmph");
 
-        put("cowgirlStartMSG0", range("girl.mommyhorny",    0, 1));
-        put("cowgirlStartMSG1", range("girl.lightbreathing",0, 7));
-        put("cowgirlStartMSG2", range("girl.moan",          0, 8));
+        SOUND_MAP.put("cowgirlStartMSG0", "girl.mommyhorny");
+        SOUND_MAP.put("cowgirlStartMSG1", "girl.lightbreathing");
+        SOUND_MAP.put("cowgirlStartMSG2", "girl.moan");
 
-        put("cowgirlcumMSG1", range("girl.moan",            0, 8));
-        put("cowgirlcumMSG2", range("girl.ahh",             0, 9));
-        put("cowgirlcumMSG3", range("girl.heavybreathing",  0, 8));
-        put("cowgirlcumMSG4", range("girl.ahh",             0, 9));
-        put("cowgirlcumMSG5", range("girl.moan",            0, 8));
-        put("cowgirlcumMSG6", range("girl.aftersessionmoan",0, 4));
+        SOUND_MAP.put("cowgirlcumMSG1", "girl.moan");
+        SOUND_MAP.put("cowgirlcumMSG2", "girl.ahh");
+        SOUND_MAP.put("cowgirlcumMSG3", "girl.heavybreathing");
+        SOUND_MAP.put("cowgirlcumMSG4", "girl.ahh");
+        SOUND_MAP.put("cowgirlcumMSG5", "girl.moan");
+        SOUND_MAP.put("cowgirlcumMSG6", "girl.aftersessionmoan");
 
-        put("cowgirlfastMSG1",     range("girl.mmm",           0, 8));
-        put("missionary_fastMSG1", range("girl.moan",          0, 8));
-        put("missionary_slowMSG1", range("girl.lightbreathing",0, 7));
-        put("missionary_cumMSG1",  range("girl.ahh",           0, 9));
-        put("missionary_cumMSG2",  range("girl.aftersessionmoan",0,4));
+        SOUND_MAP.put("cowgirlfastMSG1",     "girl.mmm");
+        SOUND_MAP.put("missionary_fastMSG1", "girl.moan");
+        SOUND_MAP.put("missionary_slowMSG1", "girl.lightbreathing");
+        SOUND_MAP.put("missionary_cumMSG1",  "girl.ahh");
+        SOUND_MAP.put("missionary_cumMSG2",  "girl.aftersessionmoan");
 
-        put("carry_introMSG1", range("girl.happyoh",   0, 2));
-        put("carry_introMSG2", range("girl.mommyhorny",0, 1));
-        put("dashMSG1",        range("girl.huh",       0, 1));
-    }
-
-    private static void put(String effect, String[] sounds) { SOUND_MAP.put(effect, sounds); }
-
-    private static String[] range(String prefix, int min, int max) {
-        String[] result = new String[max - min + 1];
-        for (int i = min; i <= max; i++) result[i - min] = prefix + i;
-        return result;
+        SOUND_MAP.put("carry_introMSG1", "girl.happyoh");
+        SOUND_MAP.put("carry_introMSG2", "girl.mommyhorny");
+        SOUND_MAP.put("dashMSG1",        "girl.huh");
     }
 }
