@@ -38,7 +38,10 @@ public class StateConfig {
         Map<String, StateDefinition> loaded = new LinkedHashMap<>();
         try {
             String json = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            // Use the instance-based parse() rather than the static parseString() —
+            // Minecraft 1.16.5 bundles Gson 2.8.0, and parseString() wasn't added
+            // until Gson 2.8.9. This older form works on every Gson version.
+            JsonObject root = new JsonParser().parse(json).getAsJsonObject();
             JsonObject states = root.getAsJsonObject("states");
 
             for (String id : states.keySet()) {

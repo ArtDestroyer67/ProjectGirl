@@ -46,7 +46,9 @@ public class SoundMapper {
 
         try {
             String json = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            // Instance-based parse() — see StateConfig.java for why (Gson 2.8.0
+            // bundled with MC 1.16.5 predates the static parseString() method).
+            JsonObject root = new JsonParser().parse(json).getAsJsonObject();
 
             JsonObject mappings = root.getAsJsonObject("mappings");
             for (String effect : mappings.keySet()) {
