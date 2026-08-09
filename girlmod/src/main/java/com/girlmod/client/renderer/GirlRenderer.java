@@ -20,7 +20,14 @@ import java.util.Set;
 @OnlyIn(Dist.CLIENT)
 public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
 
-    private final GirlModel girlModel = new GirlModel();
+    // Single shared model instance: this is what GeckoLib actually uses
+    // internally for rendering (passed to super() below) AND what we use
+    // for our own texture-location / render-pass-flag logic. These must
+    // be the SAME object — passing a second, separate `new GirlModel()`
+    // to super() here previously meant setRenderingPartnerPass() below was
+    // flipping a flag on an instance GeckoLib never reads from, so the
+    // partner rig kept resolving to girl.png no matter what.
+    private final GirlModel girlModel;
 
     /**
      * All bone names in girl_dressed.geo.json that are part of the armor.
@@ -49,7 +56,17 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
     private static final String PARTNER_RIG_BONE = "steve";
 
     public GirlRenderer(EntityRendererManager manager) {
-        super(manager, new GirlModel());
+        this(manager, new GirlModel());
+    }
+
+    // Private chaining constructor so the single GirlModel instance can be
+    // created once, passed to super(), and stashed in the field — a plain
+    // field initializer can't be used here because instance field
+    // initializers run *after* super() returns, so `girlModel` would still
+    // be null at the point super(manager, girlModel) needed it.
+    private GirlRenderer(EntityRendererManager manager, GirlModel model) {
+        super(manager, model);
+        this.girlModel = model;
         this.shadowRadius = 0.3f;
     }
 
