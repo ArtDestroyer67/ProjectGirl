@@ -112,10 +112,14 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public static AttributeModifierMap.MutableAttribute createAttributes() {
         return CreatureEntity.createLivingAttributes()
-            .add(Attributes.MAX_HEALTH,      20.0)
-            .add(Attributes.MOVEMENT_SPEED,   0.25)
-            .add(Attributes.FOLLOW_RANGE,    16.0)
-            .add(Attributes.ATTACK_DAMAGE,    3.0);
+            .add(Attributes.MAX_HEALTH,             20.0)
+            .add(Attributes.MOVEMENT_SPEED,          0.25)
+            .add(Attributes.FOLLOW_RANGE,           16.0)
+            .add(Attributes.ATTACK_DAMAGE,            3.0)
+            .add(Attributes.ATTACK_KNOCKBACK,         0.0)
+            .add(Attributes.ARMOR,                    0.0)
+            .add(Attributes.ARMOR_TOUGHNESS,          0.0)
+            .add(Attributes.KNOCKBACK_RESISTANCE,     0.0);
     }
 
     // ── AI ────────────────────────────────────────────────────────────────────
@@ -307,6 +311,23 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
                 this.getNavigation().stop(); // belt-and-braces: never let her drift while busy
             }
             StateDefinition current = getStateDef();
+
+            // Auto-switch between IDLE and WALK based on actual horizontal
+            // movement — scoped so it ONLY applies while she's currently in
+            // one of those two "default" states. This means it never fights
+            // a manually-triggered pose (HUG, COWGIRL_SLOW, ...) or a
+            // combat animation (ATTACK0/1/2, BOWCHARGE) that happens to be
+            // playing while she's also moving; those own their own state
+            // via followUp/duration and are left alone here.
+            if (current.id.equals(DEFAULT_STATE_ID) || current.id.equals("WALK")) {
+                boolean moving = isMovingHorizontally();
+                if (moving && current.id.equals(DEFAULT_STATE_ID)) {
+                    setState("WALK");
+                } else if (!moving && current.id.equals("WALK")) {
+                    setState(DEFAULT_STATE_ID);
+                }
+            }
+
             if (current.loopType == StateDefinition.LoopType.PLAY_ONCE && current.followUpId != null) {
                 animTicksInState++;
                 if (animTicksInState >= animDurationTicks && animDurationTicks > 0) {
@@ -314,6 +335,19 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
                 }
             }
         }
+    }
+
+    /**
+     * True if she's actually moving horizontally right now (walking,
+     * following, chasing a combat target) — used to auto-switch between
+     * IDLE and WALK. Checks her velocity vector rather than comparing
+     * position deltas, since that's the standard signal vanilla itself
+     * uses for movement-based animation state.
+     */
+    private boolean isMovingHorizontally() {
+        net.minecraft.util.math.vector.Vector3d vel = this.getDeltaMovement();
+        double horizontalSpeedSq = vel.x * vel.x + vel.z * vel.z;
+        return horizontalSpeedSq > 0.0025; // ~0.05 blocks/tick — below walk speed, above idle jitter
     }
 
     // ── NBT ───────────────────────────────────────────────────────────────────
