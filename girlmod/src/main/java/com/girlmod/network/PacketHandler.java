@@ -26,5 +26,12 @@ public class PacketHandler {
             PacketSetState::decode,
             PacketSetState::handle
         );
+        CHANNEL.registerMessage(
+            id++,
+            PacketSetFlag.class,
+            PacketSetFlag::encode,
+            PacketSetFlag::decode,
+            PacketSetFlag::handle
+        );
     }
 }

@@ -22,6 +22,11 @@
     "CARRY_INTRO": { "animation": "animation.ellie.carry_intro", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 200, "locksMovement": true, "followUp": "CARRY_SLOW" },
     "CARRY_SLOW":  { "animation": "animation.ellie.carry_slow1", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null },
     "CARRY_FAST":  { "animation": "animation.ellie.carry_fast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null },
-    "CARRY_CUM":   { "animation": "animation.ellie.carry_cum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 100, "locksMovement": true, "followUp": "IDLE" }
+    "CARRY_CUM":   { "animation": "animation.ellie.carry_cum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 100, "locksMovement": true, "followUp": "IDLE" },
+
+    "ATTACK0":   { "animation": "animation.ellie.attack0",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE" },
+    "ATTACK1":   { "animation": "animation.ellie.attack1",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE" },
+    "ATTACK2":   { "animation": "animation.ellie.attack2",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE" },
+    "BOWCHARGE": { "animation": "animation.ellie.bowcharge", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 20, "locksMovement": false, "followUp": "IDLE" }
   }
 }

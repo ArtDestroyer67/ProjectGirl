@@ -2,15 +2,31 @@ package com.girlmod.entity;
 
 import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
+import com.girlmod.entity.goal.FollowPlayerGoal;
+import com.girlmod.entity.goal.IdleGatedGoal;
 import com.girlmod.sound.SoundMapper;
 import net.minecraft.entity.CreatureEntity;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.attributes.AttributeModifierMap;
 import net.minecraft.entity.ai.attributes.Attributes;
+import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.ai.goal.LookAtGoal;
+import net.minecraft.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.entity.ai.goal.RandomWalkingGoal;
+import net.minecraft.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
+import net.minecraft.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.entity.monster.IRangedAttackMob;
+import net.minecraft.entity.monster.MonsterEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.projectile.ArrowEntity;
+import net.minecraft.inventory.EquipmentSlotType;
+import net.minecraft.item.BowItem;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.SwordItem;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.DataSerializers;
@@ -20,6 +36,7 @@ import net.minecraft.util.DamageSource;
 import net.minecraft.util.Hand;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
+import net.minecraft.util.SoundEvents;
 import net.minecraft.world.World;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -32,27 +49,52 @@ import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
+import java.util.Random;
+
 /**
- * State is now a plain String id (e.g. "HUG", "COWGIRL_SLOW") looked up
+ * State is a plain String id (e.g. "HUG", "COWGIRL_SLOW") looked up
  * against StateConfig, which loads its definitions from
- * config/girlmod/states.json at runtime. This means adding/editing
- * animation states no longer requires touching this class or recompiling
- * the mod — see StateConfig.java and DEVELOPMENT.md for details.
+ * config/girlmod/states.json at runtime — see StateConfig.java.
+ *
+ * On top of the pose system, this entity now also supports:
+ *   - Following the player (toggle via GUI, see FollowPlayerGoal)
+ *   - Combat: melee or bow, auto-selected based on what's in her hand
+ *     (see reassessWeaponGoal()) — attacks nearby hostile mobs like an
+ *     ally/companion (NearestAttackableTargetGoal<MonsterEntity>)
+ *   - Equipping a weapon: shift+right-click while holding a sword or
+ *     bow puts it in her mainhand
+ *   - Dress/strip toggle that swaps the actual GeoModel between
+ *     girl.geo.json (nude) and girl_dressed.geo.json — see GirlModel.java
+ *
+ * All AI behaviors are wrapped in IdleGatedGoal so nothing (wandering,
+ * following, combat) runs while a locksMovement pose from states.json
+ * is playing.
  */
-public class GirlEntity extends CreatureEntity implements IAnimatable {
+public class GirlEntity extends CreatureEntity implements IAnimatable, IRangedAttackMob {
 
     public static final String DEFAULT_STATE_ID = "IDLE";
 
-    private static final DataParameter<String> STATE =
+    private static final DataParameter<String>  STATE     =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
+    private static final DataParameter<Boolean> FOLLOWING =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
+    private static final DataParameter<Boolean> DRESSED   =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
 
     private final AnimationFactory factory = new AnimationFactory(this);
+    private final Random random = new Random();
 
     @OnlyIn(Dist.CLIENT)
     private String lastRenderedStateId;
 
     private int animTicksInState  = 0;
     private int animDurationTicks = 0;
+
+    // Combat goal instances — kept as fields so reassessWeaponGoal() can
+    // swap which one is active in the goalSelector without recreating them.
+    private final MeleeAttackGoal meleeGoalRaw = new MeleeAttackGoal(this, 1.2, true);
+    private final RangedBowAttackGoal<GirlEntity> bowGoalRaw = new RangedBowAttackGoal<>(this, 1.0, 20, 15.0F);
+    private Goal currentWeaponGoal; // the currently-added IdleGatedGoal wrapper, so we can remove it before swapping
 
     public GirlEntity(EntityType<? extends GirlEntity> type, World world) {
         super(type, world);
@@ -63,9 +105,10 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public static AttributeModifierMap.MutableAttribute createAttributes() {
         return CreatureEntity.createLivingAttributes()
-            .add(Attributes.MAX_HEALTH,     20.0)
-            .add(Attributes.MOVEMENT_SPEED,  0.25)
-            .add(Attributes.FOLLOW_RANGE,   16.0);
+            .add(Attributes.MAX_HEALTH,      20.0)
+            .add(Attributes.MOVEMENT_SPEED,   0.25)
+            .add(Attributes.FOLLOW_RANGE,    16.0)
+            .add(Attributes.ATTACK_DAMAGE,    3.0);
     }
 
     // ── AI ────────────────────────────────────────────────────────────────────
@@ -73,33 +116,46 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new SwimGoal(this));
-        this.goalSelector.addGoal(1, new WanderIfIdleGoal(this, 1.0));
-        this.goalSelector.addGoal(2, new LookAtIfIdleGoal(this, PlayerEntity.class, 8.0f));
+        this.goalSelector.addGoal(1, new IdleGatedGoal(this, new FollowPlayerGoal(this, 1.15)));
+        this.goalSelector.addGoal(1, new IdleGatedGoal(this, new RandomWalkingGoal(this, 1.0)));
+        this.goalSelector.addGoal(3, new IdleGatedGoal(this, new LookAtGoal(this, PlayerEntity.class, 8.0f)));
+
+        // Melee/bow goal is added dynamically by reassessWeaponGoal() at
+        // priority 2 — see setItemSlot() override below, which calls it
+        // whenever mainhand equipment changes (including on spawn).
+        reassessWeaponGoal();
+
+        this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
+        this.targetSelector.addGoal(2, new IdleGatedGoal(this,
+            new NearestAttackableTargetGoal<>(this, MonsterEntity.class, true)));
     }
 
-    /** True when the current animation should freeze movement/wandering. */
+    /** True when the current animation should freeze movement/wandering/combat/following. */
     public boolean isBusy() {
         return getStateDef().locksMovement;
     }
 
-    private static class WanderIfIdleGoal extends RandomWalkingGoal {
-        private final GirlEntity girl;
-        WanderIfIdleGoal(GirlEntity girl, double speed) {
-            super(girl, speed);
-            this.girl = girl;
+    /**
+     * Swaps her active combat goal based on what's in her mainhand:
+     * bow -> RangedBowAttackGoal, anything else (including empty hand
+     * or a sword) -> MeleeAttackGoal. Mirrors how vanilla Skeletons/
+     * Piglins switch between ranged and melee based on their held item.
+     */
+    private void reassessWeaponGoal() {
+        if (currentWeaponGoal != null) {
+            this.goalSelector.removeGoal(currentWeaponGoal);
         }
-        @Override public boolean canUse()           { return !girl.isBusy() && super.canUse(); }
-        @Override public boolean canContinueToUse() { return !girl.isBusy() && super.canContinueToUse(); }
+        Goal raw = (this.getMainHandItem().getItem() instanceof BowItem) ? bowGoalRaw : meleeGoalRaw;
+        currentWeaponGoal = new IdleGatedGoal(this, raw);
+        this.goalSelector.addGoal(2, currentWeaponGoal);
     }
 
-    private static class LookAtIfIdleGoal extends LookAtGoal {
-        private final GirlEntity girl;
-        LookAtIfIdleGoal(GirlEntity girl, Class<PlayerEntity> target, float range) {
-            super(girl, target, range);
-            this.girl = girl;
+    @Override
+    public void setItemSlot(EquipmentSlotType slot, ItemStack stack) {
+        super.setItemSlot(slot, stack);
+        if (!this.level.isClientSide && slot == EquipmentSlotType.MAINHAND) {
+            reassessWeaponGoal();
         }
-        @Override public boolean canUse()           { return !girl.isBusy() && super.canUse(); }
-        @Override public boolean canContinueToUse() { return !girl.isBusy() && super.canContinueToUse(); }
     }
 
     // ── Data ──────────────────────────────────────────────────────────────────
@@ -108,6 +164,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     protected void defineSynchedData() {
         super.defineSynchedData();
         this.entityData.define(STATE, DEFAULT_STATE_ID);
+        this.entityData.define(FOLLOWING, false);
+        this.entityData.define(DRESSED, false);
     }
 
     @Override
@@ -116,10 +174,47 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     @Override
     public boolean isInvulnerableTo(DamageSource source) { return true; }
 
+    // ── Following ─────────────────────────────────────────────────────────────
+
+    public boolean isFollowing() { return this.entityData.get(FOLLOWING); }
+
+    public void setFollowing(boolean following) {
+        this.entityData.set(FOLLOWING, following);
+        if (!following) {
+            this.getNavigation().stop();
+        }
+    }
+
+    // ── Dress / strip ─────────────────────────────────────────────────────────
+
+    /** True = wearing the dressed model, false = nude model. See GirlModel.java. */
+    public boolean isDressed() { return this.entityData.get(DRESSED); }
+
+    public void setDressed(boolean dressed) {
+        this.entityData.set(DRESSED, dressed);
+    }
+
     // ── Interaction ───────────────────────────────────────────────────────────
 
     @Override
     protected ActionResultType mobInteract(PlayerEntity player, Hand hand) {
+        ItemStack heldItem = player.getItemInHand(hand);
+        boolean isWeapon = heldItem.getItem() instanceof SwordItem || heldItem.getItem() instanceof BowItem;
+
+        // Shift + right-click while holding a weapon = equip it to her mainhand.
+        if (player.isShiftKeyDown() && isWeapon) {
+            if (!this.level.isClientSide) {
+                ItemStack toEquip = heldItem.copy();
+                toEquip.setCount(1);
+                this.setItemSlot(EquipmentSlotType.MAINHAND, toEquip);
+                if (!player.abilities.instabuild) {
+                    heldItem.shrink(1);
+                }
+            }
+            return ActionResultType.sidedSuccess(this.level.isClientSide);
+        }
+
+        // Otherwise: open the pose/action GUI as before.
         if (this.level.isClientSide) {
             net.minecraft.client.Minecraft.getInstance().setScreen(
                 new com.girlmod.client.gui.GuiGirlInteract(this, player)
@@ -138,7 +233,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.animDurationTicks = def.durationTicks;
 
         if (def.locksMovement) {
-            this.getNavigation().stop(); // cancel any in-progress wander path immediately
+            this.getNavigation().stop(); // cancel any in-progress wander/follow/combat path immediately
         }
 
         if (def.hasPlayer) {
@@ -159,6 +254,38 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public StateDefinition getStateDef() {
         return StateConfig.get(getStateId());
+    }
+
+    // ── Combat ────────────────────────────────────────────────────────────────
+
+    /** Triggered by MeleeAttackGoal via vanilla's attack pipeline. */
+    @Override
+    public boolean doHurtTarget(Entity target) {
+        boolean result = super.doHurtTarget(target);
+        if (result && !this.level.isClientSide) {
+            String[] swings = { "ATTACK0", "ATTACK1", "ATTACK2" };
+            setState(swings[random.nextInt(swings.length)]);
+        }
+        return result;
+    }
+
+    /** IRangedAttackMob — called by RangedBowAttackGoal when she looses an arrow. */
+    @Override
+    public void performRangedAttack(LivingEntity target, float distanceFactor) {
+        ArrowEntity arrow = new ArrowEntity(this.level, this);
+        double dx = target.getX() - this.getX();
+        double dy = target.getY(0.3333) - arrow.getY();
+        double dz = target.getZ() - this.getZ();
+        double horizontalDist = Math.sqrt(dx * dx + dz * dz);
+        arrow.shoot(dx, dy + horizontalDist * 0.2, dz, 1.6F, 14.0F - this.level.getDifficulty().getId() * 4.0F);
+        arrow.setBaseDamage(2.0);
+
+        this.playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.random.nextFloat() * 0.4F + 0.8F));
+        this.level.addFreshEntity(arrow);
+
+        if (!this.level.isClientSide) {
+            setState("BOWCHARGE");
+        }
     }
 
     // ── Tick ──────────────────────────────────────────────────────────────────
@@ -186,6 +313,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     public void addAdditionalSaveData(CompoundNBT nbt) {
         super.addAdditionalSaveData(nbt);
         nbt.putString("GirlState", getStateId());
+        nbt.putBoolean("Following", isFollowing());
+        nbt.putBoolean("Dressed", isDressed());
     }
 
     @Override
@@ -193,6 +322,12 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         super.readAdditionalSaveData(nbt);
         if (nbt.contains("GirlState")) {
             setState(nbt.getString("GirlState")); // setState() already falls back to IDLE for unknown ids
+        }
+        if (nbt.contains("Following")) {
+            setFollowing(nbt.getBoolean("Following"));
+        }
+        if (nbt.contains("Dressed")) {
+            setDressed(nbt.getBoolean("Dressed"));
         }
     }
 
