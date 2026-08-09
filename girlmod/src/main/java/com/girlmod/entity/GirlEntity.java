@@ -81,6 +81,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> ARMORED   =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
+    private static final DataParameter<Boolean> PARTNER_FORCED =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
 
     private final AnimationFactory factory = new AnimationFactory(this);
     private final Random random = new Random();
@@ -183,6 +185,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.entityData.define(FOLLOWING, false);
         this.entityData.define(DRESSED, false);
         this.entityData.define(ARMORED, false);
+        this.entityData.define(PARTNER_FORCED, false);
     }
 
     @Override
@@ -218,6 +221,20 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public void setArmored(boolean armored) {
         this.entityData.set(ARMORED, armored);
+    }
+
+    // ── Partner rig test override ────────────────────────────────────────────
+
+    /**
+     * Debug/test toggle: forces the embedded "steve" partner rig visible
+     * (with the player texture) regardless of the current pose's
+     * showPartnerRig flag — see GuiGirlInteract's "Partner Rig" button.
+     * GirlRenderer OR's this with StateDefinition.showPartnerRig.
+     */
+    public boolean isPartnerForced() { return this.entityData.get(PARTNER_FORCED); }
+
+    public void setPartnerForced(boolean forced) {
+        this.entityData.set(PARTNER_FORCED, forced);
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
@@ -371,6 +388,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         nbt.putBoolean("Following", isFollowing());
         nbt.putBoolean("Dressed", isDressed());
         nbt.putBoolean("Armored", isArmored());
+        nbt.putBoolean("PartnerForced", isPartnerForced());
     }
 
     @Override
@@ -387,6 +405,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         }
         if (nbt.contains("Armored")) {
             setArmored(nbt.getBoolean("Armored"));
+        }
+        if (nbt.contains("PartnerForced")) {
+            setPartnerForced(nbt.getBoolean("PartnerForced"));
         }
     }
 

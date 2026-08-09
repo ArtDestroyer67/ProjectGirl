@@ -69,9 +69,9 @@ public class GuiGirlInteract extends Screen {
         // ── Toggle row ────────────────────────────────────────────────────
         int cx = this.width / 2;
 
-        // How many toggles? Follow + Dress + (Armor if dressed) = 2 or 3
+        // How many toggles? Follow + Dress + Partner + (Armor if dressed) = 3 or 4
         boolean showArmor = entity.isDressed();
-        int toggleCount   = showArmor ? 3 : 2;
+        int toggleCount   = showArmor ? 4 : 3;
         int totalToggleW  = toggleCount * BTN_W + (toggleCount - 1) * 6;
         int toggleStartX  = cx - totalToggleW / 2;
 
@@ -79,9 +79,11 @@ public class GuiGirlInteract extends Screen {
         addFollowBtn(toggleStartX, TOGGLE_Y);
         // Dress toggle
         addDressBtn(toggleStartX + BTN_W + 6, TOGGLE_Y);
+        // Partner rig toggle (force-show steve for testing, independent of pose)
+        addPartnerBtn(toggleStartX + (BTN_W + 6) * 2, TOGGLE_Y);
         // Armor toggle (only when dressed)
         if (showArmor) {
-            addArmorBtn(toggleStartX + (BTN_W + 6) * 2, TOGGLE_Y);
+            addArmorBtn(toggleStartX + (BTN_W + 6) * 3, TOGGLE_Y);
         }
 
         // ── Pose buttons, paginated ───────────────────────────────────────
@@ -166,6 +168,19 @@ public class GuiGirlInteract extends Screen {
         ));
     }
 
+    private void addPartnerBtn(int x, int y) {
+        boolean forced = entity.isPartnerForced();
+        this.addButton(new Button(x, y, BTN_W, BTN_H,
+            new StringTextComponent(forced ? "Partner: ON" : "Partner: OFF"),
+            btn -> {
+                PacketHandler.CHANNEL.sendToServer(
+                    new PacketSetFlag(entity.getId(), PacketSetFlag.FLAG_PARTNER, !forced));
+                // Rebuild in place so the button label updates immediately
+                init();
+            }
+        ));
+    }
+
     // ── Pose button ───────────────────────────────────────────────────────────
 
     private void addStateBtn(int x, int y, String stateId) {
@@ -193,7 +208,8 @@ public class GuiGirlInteract extends Screen {
         String status = "State: " + prettyName(entity.getStateId())
             + (entity.isFollowing() ? "  |  Following"  : "")
             + (entity.isDressed()   ? "  |  Dressed"    : "  |  Nude")
-            + (entity.isDressed()   ? (entity.isArmored() ? "  |  Armored" : "  |  No Armor") : "");
+            + (entity.isDressed()   ? (entity.isArmored() ? "  |  Armored" : "  |  No Armor") : "")
+            + (entity.isPartnerForced() ? "  |  Partner Forced" : "");
         drawCenteredString(stack, this.font, status, this.width / 2, 22, 0xFFFFFFFF);
 
         // Page indicator (only shown when there are multiple pages)

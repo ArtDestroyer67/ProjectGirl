@@ -105,7 +105,8 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
             (AnimatedGeoModel<GirlEntity>) this.getGeoModelProvider();
 
         IBone steveBone = animatedModel.getAnimationProcessor().getBone(PARTNER_RIG_BONE);
-        boolean showPartner = entity.getStateDef().showPartnerRig && steveBone != null;
+        boolean showPartner = (entity.getStateDef().showPartnerRig || entity.isPartnerForced())
+            && steveBone != null;
 
         // --- Pass 1: girl body, steve hidden, girl texture ---
         girlModel.setRenderingPartnerPass(false);
