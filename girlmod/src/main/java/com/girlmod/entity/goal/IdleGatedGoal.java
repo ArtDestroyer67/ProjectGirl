@@ -27,11 +27,10 @@ public class IdleGatedGoal extends Goal {
         this.setFlags(delegate.getFlags());
     }
 
-    @Override public boolean canUse()                 { return !girl.isBusy() && delegate.canUse(); }
-    @Override public boolean canContinueToUse()        { return !girl.isBusy() && delegate.canContinueToUse(); }
-    @Override public boolean isInterruptable()          { return delegate.isInterruptable(); }
-    @Override public void start()                       { delegate.start(); }
-    @Override public void stop()                         { delegate.stop(); }
-    @Override public void tick()                          { delegate.tick(); }
-    @Override public boolean requiresUpdateEveryTick()     { return delegate.requiresUpdateEveryTick(); }
+    @Override public boolean canUse()          { return !girl.isBusy() && delegate.canUse(); }
+    @Override public boolean canContinueToUse() { return !girl.isBusy() && delegate.canContinueToUse(); }
+    @Override public boolean isInterruptable()   { return delegate.isInterruptable(); }
+    @Override public void start()                 { delegate.start(); }
+    @Override public void stop()                   { delegate.stop(); }
+    @Override public void tick()                    { delegate.tick(); }
 }

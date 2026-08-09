@@ -2,6 +2,7 @@ package com.girlmod.entity;
 
 import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
+import com.girlmod.entity.goal.CustomBowAttackGoal;
 import com.girlmod.entity.goal.FollowPlayerGoal;
 import com.girlmod.entity.goal.IdleGatedGoal;
 import com.girlmod.sound.SoundMapper;
@@ -12,14 +13,12 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.attributes.AttributeModifierMap;
 import net.minecraft.entity.ai.attributes.Attributes;
 import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.entity.ai.goal.HurtByTargetGoal;
 import net.minecraft.entity.ai.goal.LookAtGoal;
 import net.minecraft.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.entity.ai.goal.NearestAttackableTargetGoal;
 import net.minecraft.entity.ai.goal.RandomWalkingGoal;
-import net.minecraft.entity.ai.goal.RangedBowAttackGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
-import net.minecraft.entity.ai.goal.target.HurtByTargetGoal;
-import net.minecraft.entity.ai.goal.target.NearestAttackableTargetGoal;
-import net.minecraft.entity.monster.IRangedAttackMob;
 import net.minecraft.entity.monster.MonsterEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
@@ -70,7 +69,7 @@ import java.util.Random;
  * following, combat) runs while a locksMovement pose from states.json
  * is playing.
  */
-public class GirlEntity extends CreatureEntity implements IAnimatable, IRangedAttackMob {
+public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public static final String DEFAULT_STATE_ID = "IDLE";
 
@@ -93,7 +92,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, IRangedAt
     // Combat goal instances — kept as fields so reassessWeaponGoal() can
     // swap which one is active in the goalSelector without recreating them.
     private final MeleeAttackGoal meleeGoalRaw = new MeleeAttackGoal(this, 1.2, true);
-    private final RangedBowAttackGoal<GirlEntity> bowGoalRaw = new RangedBowAttackGoal<>(this, 1.0, 20, 15.0F);
+    private final CustomBowAttackGoal bowGoalRaw = new CustomBowAttackGoal(this, 1.0, 20, 15.0F);
     private Goal currentWeaponGoal; // the currently-added IdleGatedGoal wrapper, so we can remove it before swapping
 
     public GirlEntity(EntityType<? extends GirlEntity> type, World world) {
@@ -269,9 +268,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, IRangedAt
         return result;
     }
 
-    /** IRangedAttackMob — called by RangedBowAttackGoal when she looses an arrow. */
-    @Override
-    public void performRangedAttack(LivingEntity target, float distanceFactor) {
+    /** Called directly by CustomBowAttackGoal when she's in range and lines up a shot. */
+    public void shootArrowAt(LivingEntity target) {
         ArrowEntity arrow = new ArrowEntity(this.level, this);
         double dx = target.getX() - this.getX();
         double dy = target.getY(0.3333) - arrow.getY();
