@@ -38,6 +38,16 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
         "armorShoesL",    "armorShoesR"
     ));
 
+    /**
+     * Top-level bone name of the embedded male "steve" rig baked into the
+     * same geo file — used for synced penetration animations during sex
+     * positions. Hidden by default; only shown when the current state's
+     * showPartnerRig flag is true (see states.json / StateDefinition).
+     * Scaling this one root bone to 0 hides its entire subtree (torso,
+     * head, arms, legs, everything).
+     */
+    private static final String PARTNER_RIG_BONE = "steve";
+
     public GirlRenderer(EntityRendererManager manager) {
         super(manager, new GirlModel());
         this.shadowRadius = 0.3f;
@@ -91,6 +101,20 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
                 bone.setScaleY(0f);
                 bone.setScaleZ(0f);
             }
+        }
+
+        // Steve (embedded male partner rig) — visible only during penetrative
+        // poses (Cowgirl/Missionary/Carry), hidden the rest of the time
+        // (idle, walking, combat, hug, etc). Same "scale to 0" technique as
+        // the armor bones above; this is a single root bone so hiding it
+        // hides its entire subtree in one call.
+        boolean showPartner = entity.getStateDef().showPartnerRig;
+        IBone steveBone = animatedModel.getAnimationProcessor().getBone(PARTNER_RIG_BONE);
+        if (steveBone != null) {
+            float scale = showPartner ? 1f : 0f;
+            steveBone.setScaleX(scale);
+            steveBone.setScaleY(scale);
+            steveBone.setScaleZ(scale);
         }
     }
 }

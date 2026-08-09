@@ -18,16 +18,19 @@ public class StateDefinition {
     public final int       durationTicks;  // only used when loopType == PLAY_ONCE
     public final boolean   locksMovement;  // true = disable wandering AI while in this state
     public final String    followUpId;     // nullable — state id to switch to when PLAY_ONCE finishes
+    public final boolean   showPartnerRig; // true = the embedded "steve" male rig is visible during this pose
 
     public StateDefinition(String id, String animName, LoopType loopType,
                             boolean hasPlayer, int durationTicks,
-                            boolean locksMovement, String followUpId) {
-        this.id            = id;
-        this.animName      = animName;
-        this.loopType      = loopType;
-        this.hasPlayer     = hasPlayer;
-        this.durationTicks = durationTicks;
-        this.locksMovement = locksMovement;
-        this.followUpId    = followUpId;
+                            boolean locksMovement, String followUpId,
+                            boolean showPartnerRig) {
+        this.id             = id;
+        this.animName       = animName;
+        this.loopType       = loopType;
+        this.hasPlayer      = hasPlayer;
+        this.durationTicks  = durationTicks;
+        this.locksMovement  = locksMovement;
+        this.followUpId     = followUpId;
+        this.showPartnerRig = showPartnerRig;
     }
 }
