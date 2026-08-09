@@ -1,5 +1,7 @@
 package com.girlmod.network;
 
+import com.girlmod.config.StateConfig;
+import com.girlmod.config.StateDefinition;
 import com.girlmod.entity.GirlEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.ServerPlayerEntity;
@@ -58,6 +60,13 @@ public class PacketSetState {
             // one — see GirlEntity#applyMobIdentity/tick), so a pose picked
             // from the GUI mid-recovery is ignored rather than interrupting it.
             if (girl.isDowned()) return;
+
+            // Movement states (IDLE/WALK) are internal locomotion states,
+            // not something a player picks directly — the GUI already
+            // hides these buttons, this is defense in depth against a
+            // stale client or a hand-crafted packet.
+            StateDefinition requested = StateConfig.get(msg.stateId);
+            if (requested.isMovement) return;
 
             girl.setState(msg.stateId); // setState() validates/falls back internally
         });

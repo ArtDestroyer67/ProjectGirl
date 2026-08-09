@@ -1,6 +1,7 @@
 package com.girlmod.client.gui;
 
 import com.girlmod.config.StateConfig;
+import com.girlmod.config.StateDefinition;
 import com.girlmod.entity.GirlEntity;
 import com.girlmod.network.PacketHandler;
 import com.girlmod.network.PacketSetFlag;
@@ -13,6 +14,7 @@ import net.minecraft.util.text.StringTextComponent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -95,7 +97,15 @@ public class GuiGirlInteract extends Screen {
             return;
         }
 
-        List<String> stateIds = StateConfig.getAllIds();
+        List<String> stateIds = new ArrayList<>();
+        for (String id : StateConfig.getAllIds()) {
+            StateDefinition def = StateConfig.get(id);
+            // Movement states (IDLE/WALK) are driven automatically by her
+            // own locomotion, not something to pick from the GUI — only
+            // "interaction" animations (poses, combat swings, DOWNED) show
+            // up as buttons here.
+            if (!def.isMovement) stateIds.add(id);
+        }
         if (stateIds.isEmpty()) return;
 
         // How many rows fit between STATE_TOP_Y and bottom margin?

@@ -62,6 +62,13 @@ public class StateConfig {
                 // Optional field, defaults to false — existing states.json files on
                 // disk from before this feature was added won't have this key at all.
                 boolean showPartnerRig = s.has("showPartnerRig") && s.get("showPartnerRig").getAsBoolean();
+                // Optional field. Defaults to true for IDLE/WALK and false for
+                // everything else so existing states.json files (saved before
+                // this feature existed, with no "isMovement" key at all) still
+                // behave correctly without needing to be edited by hand.
+                boolean isMovement = s.has("isMovement")
+                    ? s.get("isMovement").getAsBoolean()
+                    : (id.equals("IDLE") || id.equals("WALK"));
 
                 StateDefinition.LoopType loopType;
                 try {
@@ -72,7 +79,7 @@ public class StateConfig {
                     continue;
                 }
 
-                loaded.put(id, new StateDefinition(id, animName, loopType, hasPlayer, duration, locks, followUp, showPartnerRig));
+                loaded.put(id, new StateDefinition(id, animName, loopType, hasPlayer, duration, locks, followUp, showPartnerRig, isMovement));
             }
 
             // Validate followUp references point at states that actually exist —
@@ -124,7 +131,7 @@ public class StateConfig {
         if (idle != null) return idle;
         // Truly nothing loaded — return a hardcoded safety net so the game never crashes
         return new StateDefinition("IDLE", "animation.ellie.idle",
-            StateDefinition.LoopType.LOOP, false, 0, false, null, false);
+            StateDefinition.LoopType.LOOP, false, 0, false, null, false, true);
     }
 
     /** All loaded state ids, in the order they appear in the JSON (used to build GUI buttons). */
@@ -181,6 +188,6 @@ public class StateConfig {
     private static void loadMinimalFallback() {
         STATES.clear();
         STATES.put("IDLE", new StateDefinition("IDLE", "animation.ellie.idle",
-            StateDefinition.LoopType.LOOP, false, 0, false, null, false));
+            StateDefinition.LoopType.LOOP, false, 0, false, null, false, true));
     }
 }

@@ -1,7 +1,7 @@
 {
   "states": {
-    "IDLE":    { "animation": "animation.ellie.idle",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false },
-    "WALK":    { "animation": "animation.ellie.walk",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false },
+    "IDLE":    { "animation": "animation.ellie.idle",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false, "isMovement": true },
+    "WALK":    { "animation": "animation.ellie.walk",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false, "isMovement": true },
     "SIT":     { "animation": "animation.ellie.sit",     "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": true,  "followUp": null, "showPartnerRig": false },
     "SITDOWN": { "animation": "animation.ellie.sitdown", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 120, "locksMovement": true, "followUp": "SIT", "showPartnerRig": false },
 

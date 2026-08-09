@@ -19,11 +19,16 @@ public class StateDefinition {
     public final boolean   locksMovement;  // true = disable wandering AI while in this state
     public final String    followUpId;     // nullable — state id to switch to when PLAY_ONCE finishes
     public final boolean   showPartnerRig; // true = the embedded "steve" male rig is visible during this pose
+    // true = this is a locomotion state (IDLE/WALK) driven automatically by
+    // movement, not something a player picks from the GUI. Everything else
+    // (poses, combat swings, DOWNED) is an "interaction" the GUI can offer,
+    // gated on !isMovement — see GuiGirlInteract#buildButtons.
+    public final boolean   isMovement;
 
     public StateDefinition(String id, String animName, LoopType loopType,
                             boolean hasPlayer, int durationTicks,
                             boolean locksMovement, String followUpId,
-                            boolean showPartnerRig) {
+                            boolean showPartnerRig, boolean isMovement) {
         this.id             = id;
         this.animName       = animName;
         this.loopType       = loopType;
@@ -32,5 +37,6 @@ public class StateDefinition {
         this.locksMovement  = locksMovement;
         this.followUpId     = followUpId;
         this.showPartnerRig = showPartnerRig;
+        this.isMovement     = isMovement;
     }
 }
