@@ -3,6 +3,7 @@ package com.girlmod.client.renderer;
 import com.girlmod.client.model.GirlModel;
 import com.girlmod.entity.GirlEntity;
 import com.mojang.blaze3d.matrix.MatrixStack;
+import com.mojang.blaze3d.vertex.IVertexBuilder;
 import net.minecraft.client.renderer.IRenderTypeBuffer;
 import net.minecraft.client.renderer.entity.EntityRendererManager;
 import net.minecraft.util.ResourceLocation;
@@ -55,10 +56,12 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
     @Override
     public void renderEarly(GirlEntity entity, MatrixStack stack,
                             float ticks, IRenderTypeBuffer renderTypeBuffer,
-                            int packedLightIn, int packedOverlayIn) {
+                            IVertexBuilder vertexBuilder,
+                            int packedLightIn, int packedOverlayIn,
+                            float red, float green, float blue, float alpha) {
 
-        super.renderEarly(entity, stack, ticks, renderTypeBuffer,
-                          packedLightIn, packedOverlayIn);
+        super.renderEarly(entity, stack, ticks, renderTypeBuffer, vertexBuilder,
+                          packedLightIn, packedOverlayIn, red, green, blue, alpha);
 
         // Only applies to the dressed model — nude model has no armor bones
         if (!entity.isDressed()) return;
@@ -67,8 +70,8 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
 
         for (String boneName : ARMOR_BONES) {
             IBone bone = this.getGeoModelProvider()
-                             .getBone(boneName)
-                             .orElse(null);
+                             .getAnimationProcessor()
+                             .getBone(boneName);
             if (bone == null) continue;
 
             if (showArmor) {
