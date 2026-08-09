@@ -67,6 +67,13 @@ public class SoundMapper {
             NON_SOUND_EFFECTS.clear();
             NON_SOUND_EFFECTS.addAll(loadedNonSound);
 
+            if (!SOUND_MAP.containsKey("attackSound") && !NON_SOUND_EFFECTS.contains("attackSound")) {
+                System.out.println("[GirlMod] WARNING: sound_mappings.json has no mapping (and no "
+                    + "nonSoundEffects entry) for 'attackSound' — combat swings will be silent. Add "
+                    + "\"attackSound\": \"minecraft:entity.player.attack.sweep\" (or your own sound) to "
+                    + "mappings, or delete sound_mappings.json to regenerate the shipped defaults.");
+            }
+
             System.out.println("[GirlMod] Loaded " + SOUND_MAP.size() + " sound mappings from " + configPath);
 
         } catch (Exception e) {
@@ -86,7 +93,14 @@ public class SoundMapper {
         if (NON_SOUND_EFFECTS.contains(effectName)) return null;
         String category = SOUND_MAP.get(effectName);
         if (category == null) return null;
-        return ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("girlmod", category));
+        // Mapping values may optionally include a namespace (e.g.
+        // "minecraft:entity.player.attack.sweep") to reuse a vanilla or
+        // other mod's sound instead of one of girlmod's own girl.*/misc.*
+        // categories. No colon = same as before, assumed to be girlmod's.
+        ResourceLocation id = category.indexOf(':') >= 0
+            ? new ResourceLocation(category)
+            : new ResourceLocation("girlmod", category);
+        return ForgeRegistries.SOUND_EVENTS.getValue(id);
     }
 
     // ── internals ────────────────────────────────────────────────────────────
