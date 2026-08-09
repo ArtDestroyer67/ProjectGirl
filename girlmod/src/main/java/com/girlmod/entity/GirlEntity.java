@@ -94,14 +94,18 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     private static final DataParameter<String> PARTNER_SKIN_KEY =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
 
-    /** How long the downed/invincible recovery lasts before she's back to full health. */
-    private static final int DOWNED_RECOVERY_TICKS = 100; // 5 seconds
     /** Radius used both to find a mob to "blame" for a downed sequence and to re-check for one each second while downed. */
     private static final double MOB_INTERACT_RADIUS = 6.0;
     /** Radius within which hostile mobs get un-targeted from her while she's busy (animation playing). */
     private static final double MOB_IGNORE_RADIUS = 12.0;
 
     private int downedTicks = 0;
+    // The mob currently "attached" to her for a downed encounter — hidden,
+    // AI-frozen, and pinned to her position for the duration (see
+    // applyMobIdentity/detachMob). Not persisted across a world reload;
+    // if that happens mid-encounter the mob just stays hidden/frozen where
+    // it was until she's manually recovered (rare edge case).
+    private MonsterEntity attachedMob;
 
     private final AnimationFactory factory = new AnimationFactory(this);
     private final Random random = new Random();
@@ -272,10 +276,11 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     /**
      * Intercepts what would otherwise be a killing blow: instead of dying,
-     * she's put into the invincible DOWNED state for DOWNED_RECOVERY_TICKS,
-     * then fully healed and returned to IDLE (see tick()). Damage that
-     * wouldn't be lethal is applied normally via super.hurt() so knockback,
-     * hurt sound/animation, etc. still work as usual.
+     * she's put into the invincible DOWNED state until the encounter
+     * naturally finishes and she returns to IDLE (see tick()'s PLAY_ONCE/
+     * followUp handling and recoverFromDowned()). Damage that wouldn't be
+     * lethal is applied normally via super.hurt() so knockback, hurt
+     * sound/animation, etc. still work as usual.
      *
      * She's no longer unconditionally invulnerable (see isInvulnerableTo
      * above) — that flag now only covers the downed/recovery window itself.
@@ -327,6 +332,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     private void applyMobIdentity(MonsterEntity mob) {
         String key = registryKeyOf(mob);
         setPartnerSkinKey(key);
+        attachMob(mob);
 
         List<String> matches = StateConfig.getIdsWithAnimationContaining(MOB_ENCOUNTER_ANIM_KEYWORD);
         if (matches.isEmpty()) {
@@ -336,6 +342,34 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         if (!matches.contains(getStateId())) {
             setState(matches.get(random.nextInt(matches.size())));
         }
+    }
+
+    /**
+     * Hides the interacting mob and freezes its AI so it visually
+     * "disappears" and is represented entirely by the reskinned partner
+     * rig instead of standing there as a separate, still-visible entity.
+     * Pinned to her exact position each tick while attached (see tick()).
+     */
+    private void attachMob(MonsterEntity mob) {
+        if (attachedMob == mob) return; // already attached to this one
+        if (attachedMob != null) detachMob(); // release whichever mob we had before
+
+        attachedMob = mob;
+        mob.setInvisible(true);
+        mob.setNoAi(true);
+        mob.setSilent(true);
+        mob.setPos(this.getX(), this.getY(), this.getZ());
+    }
+
+    /** Restores whichever mob is currently attached (if it's still alive) and clears the reference. */
+    private void detachMob() {
+        if (attachedMob == null) return;
+        if (attachedMob.isAlive()) {
+            attachedMob.setInvisible(false);
+            attachedMob.setNoAi(false);
+            attachedMob.setSilent(false);
+        }
+        attachedMob = null;
     }
 
     private static String registryKeyOf(Entity entity) {
@@ -374,6 +408,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         setDowned(false);
         setPartnerSkinKey("");
         downedTicks = 0;
+        detachMob(); // release the interacting mob back into the world
         setState("IDLE");
     }
 
@@ -488,6 +523,15 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
             if (isDowned()) {
                 downedTicks++;
+                // Keep the attached mob (if any) pinned to her position and
+                // hidden for as long as the encounter lasts.
+                if (attachedMob != null) {
+                    if (!attachedMob.isAlive()) {
+                        attachedMob = null; // it died/was removed elsewhere; drop the stale reference
+                    } else {
+                        attachedMob.setPos(this.getX(), this.getY(), this.getZ());
+                    }
+                }
                 // Re-check for a nearby mob once a second so a mob that
                 // wanders in after the downed sequence already started
                 // (e.g. she was downed by fall damage, not an attack)
@@ -498,16 +542,19 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
                         applyMobIdentity(nearby);
                     }
                 }
-                if (downedTicks >= DOWNED_RECOVERY_TICKS) {
-                    recoverFromDowned();
-                }
+                // No fixed-timer recovery anymore: she stays downed/invincible
+                // and ignored by mobs for as long as it takes — recovery only
+                // happens when the encounter animation actually finishes and
+                // she'd naturally return to IDLE (see the PLAY_ONCE/followUp
+                // block below). If no mob ever triggers a "start" pose, she
+                // stays in the generic DOWNED loop until one does.
+                //
                 // Deliberately NOT returning here — the followUp/duration
                 // block below still needs to run so a mob-triggered pose
-                // like COWGIRL_START can progress into its COWGIRL_SLOW
-                // followUp instead of freezing on its last frame. The
-                // IDLE/WALK auto-switch further down is a no-op in this
-                // branch anyway since DOWNED and any mob-encounter pose
-                // are never IDLE or WALK.
+                // like COWGIRL_START can progress and eventually recover
+                // instead of freezing on its last frame. The IDLE/WALK
+                // auto-switch further down is a no-op in this branch anyway
+                // since DOWNED and any mob-encounter pose are never IDLE/WALK.
             }
 
             StateDefinition current = getStateDef();
@@ -531,7 +578,16 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
             if (current.loopType == StateDefinition.LoopType.PLAY_ONCE && current.followUpId != null) {
                 animTicksInState++;
                 if (animTicksInState >= animDurationTicks && animDurationTicks > 0) {
-                    setState(current.followUpId);
+                    if (isDowned()) {
+                        // The mob-encounter reaction animation finished
+                        // playing — treat that as her returning to idle and
+                        // recover here, rather than following into whatever
+                        // loop state (e.g. COWGIRL_SLOW) the pose would
+                        // normally chain into for a real player-driven scene.
+                        recoverFromDowned();
+                    } else {
+                        setState(current.followUpId);
+                    }
                 }
             }
         }
