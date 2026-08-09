@@ -65,6 +65,12 @@ public class ModSounds {
     public static final RegistryObject<SoundEvent> GIRL_MOMMYHORNY =
         SOUNDS.register("girl.mommyhorny", () ->
             new SoundEvent(new ResourceLocation(GirlMod.MODID, "girl.mommyhorny")));
+    public static final RegistryObject<SoundEvent> GIRL_COMETOMOMMY =
+        SOUNDS.register("girl.cometomommy", () ->
+            new SoundEvent(new ResourceLocation(GirlMod.MODID, "girl.cometomommy")));
+    public static final RegistryObject<SoundEvent> GIRL_GOODBOY =
+        SOUNDS.register("girl.goodboy", () ->
+            new SoundEvent(new ResourceLocation(GirlMod.MODID, "girl.goodboy")));
 
     public static final RegistryObject<SoundEvent> GIRL_SIGH =
         SOUNDS.register("girl.sigh", () ->
