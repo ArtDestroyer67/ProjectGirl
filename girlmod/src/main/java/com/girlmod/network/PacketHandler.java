@@ -33,5 +33,12 @@ public class PacketHandler {
             PacketSetFlag::decode,
             PacketSetFlag::handle
         );
+        CHANNEL.registerMessage(
+            id++,
+            PacketRecover.class,
+            PacketRecover::encode,
+            PacketRecover::decode,
+            PacketRecover::handle
+        );
     }
 }

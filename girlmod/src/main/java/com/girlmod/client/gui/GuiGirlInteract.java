@@ -4,6 +4,7 @@ import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
 import com.girlmod.entity.GirlEntity;
 import com.girlmod.network.PacketHandler;
+import com.girlmod.network.PacketRecover;
 import com.girlmod.network.PacketSetFlag;
 import com.girlmod.network.PacketSetState;
 import com.mojang.blaze3d.matrix.MatrixStack;
@@ -88,12 +89,15 @@ public class GuiGirlInteract extends Screen {
             addArmorBtn(toggleStartX + (BTN_W + 6) * 3, TOGGLE_Y);
         }
 
-        // ── Pose buttons, paginated ───────────────────────────────────────
-        // Hidden entirely while downed — the recovery sequence drives her
-        // state itself (see PacketSetState), a picked pose would just be
-        // silently ignored server-side, which is confusing without this.
+        // ── Pose buttons, paginated (or a Recover button while downed) ─────
+        // Pose picking is hidden entirely while downed — she stays downed
+        // indefinitely (no automatic recovery) until a player manually
+        // clicks Recover, sent via PacketRecover. A pose click would be
+        // silently ignored server-side by PacketSetState anyway, so this
+        // avoids showing a grid of buttons that don't do anything.
         if (entity.isDowned()) {
             pagesTotal = 1;
+            addRecoverBtn(cx - BTN_W / 2, STATE_TOP_Y);
             return;
         }
 
@@ -213,6 +217,18 @@ public class GuiGirlInteract extends Screen {
         ));
     }
 
+    // ── Recover button (shown instead of the pose grid while downed) ───────────
+
+    private void addRecoverBtn(int x, int y) {
+        this.addButton(new Button(x, y, BTN_W, BTN_H,
+            new StringTextComponent("Recover"),
+            btn -> {
+                PacketHandler.CHANNEL.sendToServer(new PacketRecover(entity.getId()));
+                this.onClose();
+            }
+        ));
+    }
+
     // ── Render ────────────────────────────────────────────────────────────────
 
     @Override
@@ -231,7 +247,7 @@ public class GuiGirlInteract extends Screen {
         drawCenteredString(stack, this.font, status, this.width / 2, 22, 0xFFFFFFFF);
 
         if (entity.isDowned()) {
-            drawCenteredString(stack, this.font, "Downed — recovering...",
+            drawCenteredString(stack, this.font, "Downed — click Recover to heal her",
                 this.width / 2, STATE_TOP_Y, 0xFFFF5555);
         }
 

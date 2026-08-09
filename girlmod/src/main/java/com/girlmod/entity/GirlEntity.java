@@ -412,6 +412,13 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         setState("IDLE");
     }
 
+    /** Manual recovery triggered by the GUI "Recover" button — see PacketRecover. No-op if she isn't currently downed. */
+    public void forceRecover() {
+        if (this.level.isClientSide) return;
+        if (!isDowned()) return;
+        recoverFromDowned();
+    }
+
     // ── Interaction ───────────────────────────────────────────────────────────
 
     @Override
@@ -536,22 +543,27 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
                 // wanders in after the downed sequence already started
                 // (e.g. she was downed by fall damage, not an attack)
                 // still gets picked up and swaps in its identity/animation.
+                // Only re-triggers for a genuinely NEW mob (attachedMob
+                // changed) — otherwise, once she's progressed past the
+                // "start" pose into its normal followUp (e.g. COWGIRL_SLOW,
+                // which doesn't match the "start" filter), this would keep
+                // yanking her back into a fresh COWGIRL_START every second.
                 if (downedTicks % 20 == 0) {
                     MonsterEntity nearby = findNearestMonster(MOB_INTERACT_RADIUS);
-                    if (nearby != null) {
+                    if (nearby != null && nearby != attachedMob) {
                         applyMobIdentity(nearby);
                     }
                 }
-                // No fixed-timer recovery anymore: she stays downed/invincible
-                // and ignored by mobs for as long as it takes — recovery only
-                // happens when the encounter animation actually finishes and
-                // she'd naturally return to IDLE (see the PLAY_ONCE/followUp
-                // block below). If no mob ever triggers a "start" pose, she
-                // stays in the generic DOWNED loop until one does.
+                // No automatic recovery: she stays downed/invincible and
+                // ignored by mobs indefinitely — the only way out is a
+                // player manually clicking "Recover" in the GUI (see
+                // forceRecover() / PacketRecover), whether she's sitting in
+                // the generic DOWNED loop or has progressed into a full
+                // mob-triggered scene (COWGIRL_START -> COWGIRL_SLOW, etc).
                 //
                 // Deliberately NOT returning here — the followUp/duration
                 // block below still needs to run so a mob-triggered pose
-                // like COWGIRL_START can progress and eventually recover
+                // like COWGIRL_START can progress into its own followUp
                 // instead of freezing on its last frame. The IDLE/WALK
                 // auto-switch further down is a no-op in this branch anyway
                 // since DOWNED and any mob-encounter pose are never IDLE/WALK.
@@ -578,16 +590,14 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
             if (current.loopType == StateDefinition.LoopType.PLAY_ONCE && current.followUpId != null) {
                 animTicksInState++;
                 if (animTicksInState >= animDurationTicks && animDurationTicks > 0) {
-                    if (isDowned()) {
-                        // The mob-encounter reaction animation finished
-                        // playing — treat that as her returning to idle and
-                        // recover here, rather than following into whatever
-                        // loop state (e.g. COWGIRL_SLOW) the pose would
-                        // normally chain into for a real player-driven scene.
-                        recoverFromDowned();
-                    } else {
-                        setState(current.followUpId);
-                    }
+                    // Downed no longer auto-recovers when a mob-triggered
+                    // pose (e.g. COWGIRL_START) finishes — it just chains
+                    // into its normal followUp (COWGIRL_SLOW) like any
+                    // other pose and stays there. She only leaves the
+                    // downed/invincible state via a manual GUI "Recover"
+                    // (PacketRecover) or a fresh mob-nearby re-check, not
+                    // automatically.
+                    setState(current.followUpId);
                 }
             }
         }
