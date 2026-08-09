@@ -79,6 +79,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> DRESSED   =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
+    private static final DataParameter<Boolean> ARMORED   =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
 
     private final AnimationFactory factory = new AnimationFactory(this);
     private final Random random = new Random();
@@ -180,6 +182,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.entityData.define(STATE, DEFAULT_STATE_ID);
         this.entityData.define(FOLLOWING, false);
         this.entityData.define(DRESSED, false);
+        this.entityData.define(ARMORED, false);
     }
 
     @Override
@@ -206,6 +209,15 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
 
     public void setDressed(boolean dressed) {
         this.entityData.set(DRESSED, dressed);
+    }
+
+    // ── Armor ─────────────────────────────────────────────────────────────────
+
+    /** True = armor bones visible on the dressed model. See GirlRenderer.ARMOR_BONES. */
+    public boolean isArmored() { return this.entityData.get(ARMORED); }
+
+    public void setArmored(boolean armored) {
+        this.entityData.set(ARMORED, armored);
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
@@ -358,6 +370,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         nbt.putString("GirlState", getStateId());
         nbt.putBoolean("Following", isFollowing());
         nbt.putBoolean("Dressed", isDressed());
+        nbt.putBoolean("Armored", isArmored());
     }
 
     @Override
@@ -371,6 +384,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         }
         if (nbt.contains("Dressed")) {
             setDressed(nbt.getBoolean("Dressed"));
+        }
+        if (nbt.contains("Armored")) {
+            setArmored(nbt.getBoolean("Armored"));
         }
     }
 
