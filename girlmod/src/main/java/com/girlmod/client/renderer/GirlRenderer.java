@@ -59,6 +59,69 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
     }
 
     /**
+     * Top-level bones that hold the entire girl mesh in both geo files
+     * ("items" only exists in girl_dressed.geo.json — harmless no-op lookup
+     * on the nude model). Kept separate from PARTNER_RIG_BONE ("steve"),
+     * which is its own top-level bone.
+     */
+    private static final String[] GIRL_ROOT_BONES = { "body", "items" };
+
+    /**
+     * Draws the entity in up to two passes so the girl body and the
+     * embedded "steve" partner rig can each use their own texture
+     * (GeckoLib binds a single texture per render() call, so a mid-draw
+     * texture swap isn't possible — two full passes, each hiding the
+     * bones that don't belong to it, is the standard workaround).
+     *
+     * Pass 1 — girl body visible, steve hidden, girl.png bound.
+     * Pass 2 — only steve visible, girl body hidden, player/steve.png
+     *          bound. Only runs when the current pose calls for the
+     *          partner rig to be shown at all.
+     */
+    @Override
+    public void render(GirlEntity entity, float entityYaw, float partialTicks,
+                        MatrixStack matrixStackIn, IRenderTypeBuffer bufferIn,
+                        int packedLightIn) {
+
+        @SuppressWarnings("unchecked")
+        AnimatedGeoModel<GirlEntity> animatedModel =
+            (AnimatedGeoModel<GirlEntity>) this.getGeoModelProvider();
+
+        IBone steveBone = animatedModel.getAnimationProcessor().getBone(PARTNER_RIG_BONE);
+        boolean showPartner = entity.getStateDef().showPartnerRig && steveBone != null;
+
+        // --- Pass 1: girl body, steve hidden, girl texture ---
+        girlModel.setRenderingPartnerPass(false);
+        setBoneScale(steveBone, 0f);
+        super.render(entity, entityYaw, partialTicks, matrixStackIn, bufferIn, packedLightIn);
+
+        // --- Pass 2: steve only, player texture ---
+        if (showPartner) {
+            for (String name : GIRL_ROOT_BONES) {
+                setBoneScale(animatedModel.getAnimationProcessor().getBone(name), 0f);
+            }
+            setBoneScale(steveBone, 1f);
+            girlModel.setRenderingPartnerPass(true);
+
+            super.render(entity, entityYaw, partialTicks, matrixStackIn, bufferIn, packedLightIn);
+
+            // Restore so the next frame (and anything else that reads bone
+            // scale, e.g. hitboxes) sees the normal girl-visible state.
+            girlModel.setRenderingPartnerPass(false);
+            for (String name : GIRL_ROOT_BONES) {
+                setBoneScale(animatedModel.getAnimationProcessor().getBone(name), 1f);
+            }
+        }
+    }
+
+    private static void setBoneScale(IBone bone, float scale) {
+        if (bone == null) return;
+        bone.setScaleX(scale);
+        bone.setScaleY(scale);
+        bone.setScaleZ(scale);
+    }
+
+    /**
      * Called by GeckoLib just before the model is rendered each frame.
      * We use it to toggle armor bone visibility based on entity.isArmored().
      * Scaling to 0 is the standard GeckoLib way to hide bones at runtime
@@ -103,18 +166,9 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
             }
         }
 
-        // Steve (embedded male partner rig) — visible only during penetrative
-        // poses (Cowgirl/Missionary/Carry), hidden the rest of the time
-        // (idle, walking, combat, hug, etc). Same "scale to 0" technique as
-        // the armor bones above; this is a single root bone so hiding it
-        // hides its entire subtree in one call.
-        boolean showPartner = entity.getStateDef().showPartnerRig;
-        IBone steveBone = animatedModel.getAnimationProcessor().getBone(PARTNER_RIG_BONE);
-        if (steveBone != null) {
-            float scale = showPartner ? 1f : 0f;
-            steveBone.setScaleX(scale);
-            steveBone.setScaleY(scale);
-            steveBone.setScaleZ(scale);
-        }
+        // NOTE: the "steve" partner-rig bone is no longer toggled here.
+        // It's now controlled by render() below, which needs to flip it
+        // between two full render passes (one per texture) rather than
+        // once per frame — see render() for details.
     }
 }
