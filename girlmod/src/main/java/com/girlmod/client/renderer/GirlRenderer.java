@@ -133,6 +133,12 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
 
     private static void setBoneScale(IBone bone, float scale) {
         if (bone == null) return;
+        // Use the library's real hide flag (matches the approach used by
+        // the reference GeckoLib mods this project's geo files came from)
+        // rather than relying purely on 0-scale, which only fakes
+        // invisibility via degenerate geometry instead of skipping the
+        // bone during the render walk.
+        bone.setHidden(scale == 0f);
         bone.setScaleX(scale);
         bone.setScaleY(scale);
         bone.setScaleZ(scale);
