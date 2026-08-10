@@ -102,6 +102,12 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     // recently downed her / is nearby while she's downed, e.g. "zombie".
     private static final DataParameter<String> PARTNER_SKIN_KEY =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
+    // Which SkinConfig entry's geo+texture set she's currently using — see
+    // GuiGirlInteract's "Skin" button / PacketSetSkin. Synced automatically
+    // like every other DataParameter, so a skin change is visible to every
+    // nearby client immediately, no reconnect/relog needed.
+    private static final DataParameter<String> SKIN_ID =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
 
     /**
      * Distance an eligible mob must actually close to before the
@@ -230,6 +236,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         this.entityData.define(PARTNER_FORCED, false);
         this.entityData.define(DOWNED, false);
         this.entityData.define(PARTNER_SKIN_KEY, "");
+        this.entityData.define(SKIN_ID, com.girlmod.config.SkinConfig.DEFAULT_SKIN_ID);
     }
 
     @Override
@@ -311,6 +318,16 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
 
     /** Registry path (e.g. "zombie") of whichever mob's identity the partner rig is currently wearing, or "" for the default player skin. */
     public String getPartnerSkinKey() { return this.entityData.get(PARTNER_SKIN_KEY); }
+
+    // ── Skin (geo + texture set) ─────────────────────────────────────────────
+
+    /** Id of her currently selected skin — see SkinConfig. Always resolves to a real entry (falls back to "default" if the stored id is unknown). */
+    public String getSkinId() { return this.entityData.get(SKIN_ID); }
+
+    public void setSkinId(String id) {
+        this.entityData.set(SKIN_ID, (id == null || !com.girlmod.config.SkinConfig.exists(id))
+            ? com.girlmod.config.SkinConfig.DEFAULT_SKIN_ID : id);
+    }
 
     private void setPartnerSkinKey(String key) { this.entityData.set(PARTNER_SKIN_KEY, key == null ? "" : key); }
 
@@ -696,6 +713,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         nbt.putBoolean("Downed", isDowned());
         nbt.putInt("DownedTicks", downedTicks);
         nbt.putString("PartnerSkinKey", getPartnerSkinKey());
+        nbt.putString("SkinId", getSkinId());
     }
 
     @Override
@@ -721,6 +739,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         }
         if (nbt.contains("PartnerSkinKey")) {
             setPartnerSkinKey(nbt.getString("PartnerSkinKey"));
+        }
+        if (nbt.contains("SkinId")) {
+            setSkinId(nbt.getString("SkinId"));
         }
     }
 

@@ -47,5 +47,12 @@ public class PacketHandler {
             PacketOpenInventory::decode,
             PacketOpenInventory::handle
         );
+        CHANNEL.registerMessage(
+            id++,
+            PacketSetSkin.class,
+            PacketSetSkin::encode,
+            PacketSetSkin::decode,
+            PacketSetSkin::handle
+        );
     }
 }

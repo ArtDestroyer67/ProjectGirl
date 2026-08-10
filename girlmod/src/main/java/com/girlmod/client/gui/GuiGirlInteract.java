@@ -1,5 +1,6 @@
 package com.girlmod.client.gui;
 
+import com.girlmod.config.SkinConfig;
 import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
 import com.girlmod.entity.GirlEntity;
@@ -7,6 +8,7 @@ import com.girlmod.network.PacketHandler;
 import com.girlmod.network.PacketOpenInventory;
 import com.girlmod.network.PacketRecover;
 import com.girlmod.network.PacketSetFlag;
+import com.girlmod.network.PacketSetSkin;
 import com.girlmod.network.PacketSetState;
 import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.gui.screen.Screen;
@@ -52,6 +54,9 @@ public class GuiGirlInteract extends Screen {
     // Pagination state
     private int currentPage = 0;
     private int pagesTotal  = 1;
+    // Whether the bottom panel is currently showing the skin list instead
+    // of the pose grid — toggled by the "Skins"/"Poses" button.
+    private boolean showingSkins = false;
 
     public GuiGirlInteract(GirlEntity entity, PlayerEntity player) {
         super(new StringTextComponent("Girl"));
@@ -73,8 +78,8 @@ public class GuiGirlInteract extends Screen {
         // ── Toggle row ────────────────────────────────────────────────────
         int cx = this.width / 2;
 
-        // Toggles: Follow + Dress + Partner + Inventory = always 4
-        int toggleCount   = 4;
+        // Toggles: Follow + Dress + Partner + Inventory + Skins = always 5
+        int toggleCount   = 5;
         int totalToggleW  = toggleCount * BTN_W + (toggleCount - 1) * 6;
         int toggleStartX  = cx - totalToggleW / 2;
 
@@ -86,8 +91,11 @@ public class GuiGirlInteract extends Screen {
         addPartnerBtn(toggleStartX + (BTN_W + 6) * 2, TOGGLE_Y);
         // Inventory — opens the real armor/item equip screen (GirlContainer)
         addInventoryBtn(toggleStartX + (BTN_W + 6) * 3, TOGGLE_Y);
+        // Skins — swaps the bottom panel between the pose grid and the skin list
+        addSkinsToggleBtn(toggleStartX + (BTN_W + 6) * 4, TOGGLE_Y);
 
-        // ── Pose buttons, paginated (or a Recover button while downed) ─────
+        // ── Pose buttons, paginated (or a Recover button while downed, or
+        //    the skin list if toggled) ───────────────────────────────────
         // Pose picking is hidden entirely while downed — she stays downed
         // indefinitely (no automatic recovery) until a player manually
         // clicks Recover, sent via PacketRecover. A pose click would be
@@ -96,6 +104,11 @@ public class GuiGirlInteract extends Screen {
         if (entity.isDowned()) {
             pagesTotal = 1;
             addRecoverBtn(cx - BTN_W / 2, STATE_TOP_Y);
+            return;
+        }
+
+        if (showingSkins) {
+            buildSkinButtons(cx);
             return;
         }
 
@@ -132,7 +145,39 @@ public class GuiGirlInteract extends Screen {
             addStateBtn(x, y, id);
         }
 
-        // ── Pagination controls ────────────────────────────────────────────
+        addPaginationControls(cx);
+    }
+
+    /** Same paginated 2-column grid layout as the pose buttons, sourced from SkinConfig instead of StateConfig. */
+    private void buildSkinButtons(int cx) {
+        List<String> skinIds = new ArrayList<>(SkinConfig.getAll().keySet());
+        if (skinIds.isEmpty()) return;
+
+        int usableH  = this.height - STATE_TOP_Y - MARGIN_BOT;
+        int rowsPerPage = Math.max(1, usableH / GAP);
+        int perPage  = rowsPerPage * 2; // 2 columns
+
+        pagesTotal  = Math.max(1, (int) Math.ceil((double) skinIds.size() / perPage));
+        currentPage = Math.min(currentPage, pagesTotal - 1);
+
+        int startIdx = currentPage * perPage;
+        int endIdx   = Math.min(startIdx + perPage, skinIds.size());
+        List<String> pageIds = skinIds.subList(startIdx, endIdx);
+
+        int halfPage = (int) Math.ceil(pageIds.size() / 2.0);
+        for (int i = 0; i < pageIds.size(); i++) {
+            String id  = pageIds.get(i);
+            int col    = i / halfPage;
+            int row    = i % halfPage;
+            int x      = cx + (col == 0 ? -BTN_W - 3 : 3);
+            int y      = STATE_TOP_Y + row * GAP;
+            addSkinBtn(x, y, id);
+        }
+
+        addPaginationControls(cx);
+    }
+
+    private void addPaginationControls(int cx) {
         if (pagesTotal > 1) {
             int pageY = this.height - MARGIN_BOT + 4;
 
@@ -198,6 +243,17 @@ public class GuiGirlInteract extends Screen {
         ));
     }
 
+    private void addSkinsToggleBtn(int x, int y) {
+        this.addButton(new Button(x, y, BTN_W, BTN_H,
+            new StringTextComponent(showingSkins ? "Poses" : "Skins"),
+            btn -> {
+                showingSkins = !showingSkins;
+                currentPage = 0; // switching lists — start back at page 1
+                init();
+            }
+        ));
+    }
+
     // ── Pose button ───────────────────────────────────────────────────────────
 
     private void addStateBtn(int x, int y, String stateId) {
@@ -207,6 +263,20 @@ public class GuiGirlInteract extends Screen {
             btn -> {
                 PacketHandler.CHANNEL.sendToServer(
                     new PacketSetState(entity.getId(), stateId));
+                this.onClose();
+            }
+        ));
+    }
+
+    // ── Skin button ───────────────────────────────────────────────────────────
+
+    private void addSkinBtn(int x, int y, String skinId) {
+        boolean active = entity.getSkinId().equals(skinId);
+        String displayName = SkinConfig.get(skinId).displayName;
+        this.addButton(new Button(x, y, BTN_W, BTN_H,
+            new StringTextComponent(active ? "\u25BA " + displayName : displayName),
+            btn -> {
+                PacketHandler.CHANNEL.sendToServer(new PacketSetSkin(entity.getId(), skinId));
                 this.onClose();
             }
         ));
@@ -238,7 +308,8 @@ public class GuiGirlInteract extends Screen {
             + (entity.isFollowing() ? "  |  Following"  : "")
             + (entity.isDressed()   ? "  |  Dressed"    : "  |  Nude")
             + (entity.hasAnyArmorEquipped() ? "  |  Armored" : "")
-            + (entity.isPartnerForced() ? "  |  Partner Forced" : "");
+            + (entity.isPartnerForced() ? "  |  Partner Forced" : "")
+            + "  |  Skin: " + SkinConfig.get(entity.getSkinId()).displayName;
         drawCenteredString(stack, this.font, status, this.width / 2, 22, 0xFFFFFFFF);
 
         if (entity.isDowned()) {

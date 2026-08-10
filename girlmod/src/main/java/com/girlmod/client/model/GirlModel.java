@@ -1,5 +1,6 @@
 package com.girlmod.client.model;
 
+import com.girlmod.config.SkinConfig;
 import com.girlmod.entity.GirlEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.ResourceLocation;
@@ -13,36 +14,30 @@ import java.util.Map;
 /**
  * GeoModel for GirlEntity.
  *
- * getModelLocation() now checks entity.isDressed() and returns one of
- * two geo files — GeckoLib re-queries this every render, so toggling
- * the DRESSED flag (via the GUI "Dress"/"Strip" button) swaps her
- * actual 3D model live, no animation needed for the swap itself.
+ * getModelLocation()/getTextureLocation() resolve through SkinConfig based
+ * on entity.getSkinId() — GeckoLib re-queries both every render, so
+ * picking a different skin (via the GUI "Skin" button / PacketSetSkin)
+ * swaps her actual 3D model AND texture live, no reload/relog needed.
+ * getModelLocation() also still checks entity.isDressed() the same as
+ * before — dressed/nude is a separate, orthogonal toggle from which skin
+ * (SkinConfig entry) supplies the actual geo/texture pair for either state.
  *
- * Both geo files were copied from fapcraft's Ellie as a starting point:
- *   girl.geo.json         - nude body
- *   girl_dressed.geo.json - clothed body
- * Replace either (or both) with your own once you have final assets —
- * nothing else needs to change as long as the filenames match.
+ * The bundled "default" skin's assets were originally copied from
+ * fapcraft's Ellie as a starting point. Add more skins by adding their
+ * geo/texture files under assets/girlmod/ (or a resource pack) and a
+ * matching entry in config/girlmod/skins.json — see SkinConfig.
  */
 @OnlyIn(Dist.CLIENT)
 public class GirlModel extends AnimatedGeoModel<GirlEntity> {
 
-    private static final ResourceLocation GEO_NUDE =
-        new ResourceLocation("girlmod", "geo/girl/girl.geo.json");
-    private static final ResourceLocation GEO_DRESSED =
-        new ResourceLocation("girlmod", "geo/girl/girl_dressed.geo.json");
-
-    private static final ResourceLocation TEX_GIRL =
-        new ResourceLocation("girlmod", "textures/entity/girl/girl.png");
+    private static final ResourceLocation ANIM =
+        new ResourceLocation("girlmod", "animations/girl/girl.animation.json");
 
     // Separate sheet for the embedded "steve" partner rig, so it never
     // shares UV space with the girl atlas. Lives in its own folder so it
     // can later be swapped for the real local-player skin if desired.
     private static final ResourceLocation TEX_PLAYER =
         new ResourceLocation("girlmod", "textures/player/steve.png");
-
-    private static final ResourceLocation ANIM =
-        new ResourceLocation("girlmod", "animations/girl/girl.animation.json");
 
     // Resolved textures/player/<mobName>.png -> whether that file actually
     // exists, cached so we're not hitting the resource manager every frame.
@@ -65,13 +60,22 @@ public class GirlModel extends AnimatedGeoModel<GirlEntity> {
 
     @Override
     public ResourceLocation getModelLocation(GirlEntity entity) {
-        return entity.isDressed() ? GEO_DRESSED : GEO_NUDE;
+        SkinConfig.SkinDefinition skin = SkinConfig.get(entity.getSkinId());
+        String path = entity.isDressed() ? skin.geoDressed : skin.geoNude;
+        return resourceLocationOf(path);
     }
 
     @Override
     public ResourceLocation getTextureLocation(GirlEntity entity) {
-        if (!renderingPartnerPass) return TEX_GIRL;
+        if (!renderingPartnerPass) {
+            return resourceLocationOf(SkinConfig.get(entity.getSkinId()).texture);
+        }
         return resolvePartnerTexture(entity.getPartnerSkinKey());
+    }
+
+    /** Namespace-optional path -> ResourceLocation, same convention as SoundMapper's mappings: no colon = assumed under "girlmod". */
+    private static ResourceLocation resourceLocationOf(String path) {
+        return path.indexOf(':') >= 0 ? new ResourceLocation(path) : new ResourceLocation("girlmod", path);
     }
 
     /**

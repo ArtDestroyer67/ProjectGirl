@@ -4,6 +4,7 @@ import com.girlmod.client.effect.ClientEffects;
 import com.girlmod.client.gui.GirlContainerScreen;
 import com.girlmod.client.renderer.GirlRenderer;
 import com.girlmod.config.MobInteractConfig;
+import com.girlmod.config.SkinConfig;
 import com.girlmod.config.StateConfig;
 import com.girlmod.entity.GirlEntity;
 import com.girlmod.init.ModContainers;
@@ -64,6 +65,7 @@ public class GirlMod {
             StateConfig.load();
             SoundMapper.load();
             MobInteractConfig.load();
+            SkinConfig.load();
         });
     }
 
@@ -129,9 +131,10 @@ public class GirlMod {
                         StateConfig.reload();
                         SoundMapper.reload();
                         MobInteractConfig.reload();
+                        SkinConfig.reload();
                         ctx.getSource().sendSuccess(
                             new StringTextComponent(TextFormatting.GREEN
-                                + "[GirlMod] Reloaded states.json, sound_mappings.json, and mob_interact.json from config/girlmod/"),
+                                + "[GirlMod] Reloaded states.json, sound_mappings.json, mob_interact.json, and skins.json from config/girlmod/"),
                             true
                         );
                         return 1;

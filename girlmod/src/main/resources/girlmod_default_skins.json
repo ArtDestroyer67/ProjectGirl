@@ -1,0 +1,10 @@
+{
+  "skins": {
+    "default": {
+      "displayName": "Default",
+      "geoNude": "geo/girl/girl.geo.json",
+      "geoDressed": "geo/girl/girl_dressed.geo.json",
+      "texture": "textures/entity/girl/girl.png"
+    }
+  }
+}
