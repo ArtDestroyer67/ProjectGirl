@@ -1,4 +1,6 @@
 {
   "mode": "BLACKLIST",
-  "mobs": []
+  "mobs": [],
+  "encounterStates": ["COWGIRL_START", "MISSIONARY_START"],
+  "perMobEncounterStates": {}
 }

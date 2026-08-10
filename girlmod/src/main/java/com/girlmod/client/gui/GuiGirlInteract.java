@@ -22,6 +22,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * Interaction GUI — right-click GirlEntity to open.
@@ -49,9 +50,14 @@ public class GuiGirlInteract extends Screen {
     private static final int BTN_H       = 18;
     private static final int GAP         = 22;   // vertical spacing between buttons
     private static final int TOGGLE_Y    = 36;
-    private static final int STATE_TOP_Y = 62;   // first pose button Y
     private static final int PAGE_BTN_H  = 16;
     private static final int MARGIN_BOT  = 28;   // space reserved at bottom for page controls
+    private static final int ROW_MARGIN  = 10;   // left/right margin used when deciding how many buttons fit per row
+
+    // Recomputed each buildButtons() call based on how many rows the
+    // toggle row (and, for poses, the group row) actually needed to wrap
+    // into on the current screen width — see layoutButtonRow().
+    private int stateTopY = 62;
 
     // Pagination state
     private int currentPage = 0;
@@ -84,24 +90,20 @@ public class GuiGirlInteract extends Screen {
         this.buttons.clear();
         this.children.clear();
 
-        // ── Toggle row ────────────────────────────────────────────────────
+        // ── Toggle row — wraps onto additional rows automatically if the
+        //    5 buttons don't fit the current screen width, instead of
+        //    running off-screen. ────────────────────────────────────────
         int cx = this.width / 2;
 
-        // Toggles: Follow + Dress + Partner + Inventory + Skins = always 5
-        int toggleCount   = 5;
-        int totalToggleW  = toggleCount * BTN_W + (toggleCount - 1) * 6;
-        int toggleStartX  = cx - totalToggleW / 2;
+        List<BiConsumer<Integer, Integer>> toggles = new ArrayList<>();
+        toggles.add(this::addFollowBtn);
+        toggles.add(this::addDressBtn);
+        toggles.add(this::addPartnerBtn);
+        toggles.add(this::addInventoryBtn);
+        toggles.add(this::addViewModeToggleBtn);
+        int toggleRows = layoutButtonRow(TOGGLE_Y, toggles, BTN_W);
 
-        // Follow toggle
-        addFollowBtn(toggleStartX, TOGGLE_Y);
-        // Dress toggle
-        addDressBtn(toggleStartX + BTN_W + 6, TOGGLE_Y);
-        // Partner rig toggle (force-show steve for testing, independent of pose)
-        addPartnerBtn(toggleStartX + (BTN_W + 6) * 2, TOGGLE_Y);
-        // Inventory — opens the real armor/item equip screen (GirlContainer)
-        addInventoryBtn(toggleStartX + (BTN_W + 6) * 3, TOGGLE_Y);
-        // Cycles the bottom panel between poses / skins / animation sets
-        addViewModeToggleBtn(toggleStartX + (BTN_W + 6) * 4, TOGGLE_Y);
+        stateTopY = TOGGLE_Y + toggleRows * GAP;
 
         // ── Pose buttons, paginated (or a Recover button while downed, or
         //    the skin/anim-set list depending on viewMode) ─────────────────
@@ -112,7 +114,7 @@ public class GuiGirlInteract extends Screen {
         // avoids showing a grid of buttons that don't do anything.
         if (entity.isDowned()) {
             pagesTotal = 1;
-            addRecoverBtn(cx - BTN_W / 2, STATE_TOP_Y);
+            addRecoverBtn(cx - BTN_W / 2, stateTopY);
             return;
         }
 
@@ -131,7 +133,8 @@ public class GuiGirlInteract extends Screen {
         if (currentGroup == null || !groups.contains(currentGroup)) {
             currentGroup = groups.get(0);
         }
-        addGroupToggleBtn(cx - BTN_W / 2, TOGGLE_Y + GAP, groups);
+        addGroupToggleBtn(cx - BTN_W / 2, stateTopY, groups);
+        int poseTopY = stateTopY + GAP;
 
         List<String> stateIds = new ArrayList<>();
         for (String id : StateConfig.getAllIds()) {
@@ -148,8 +151,6 @@ public class GuiGirlInteract extends Screen {
         if (stateIds.isEmpty()) return;
 
         // How many rows fit between the pose grid's top and bottom margin?
-        // Starts one GAP lower than before to make room for the group row.
-        int poseTopY = STATE_TOP_Y + GAP;
         int usableH  = this.height - poseTopY - MARGIN_BOT;
         int rowsPerPage = Math.max(1, usableH / GAP);
         int perPage  = rowsPerPage * 2; // 2 columns
@@ -179,7 +180,7 @@ public class GuiGirlInteract extends Screen {
         List<String> skinIds = new ArrayList<>(SkinConfig.getAll().keySet());
         if (skinIds.isEmpty()) return;
 
-        int usableH  = this.height - STATE_TOP_Y - MARGIN_BOT;
+        int usableH  = this.height - stateTopY - MARGIN_BOT;
         int rowsPerPage = Math.max(1, usableH / GAP);
         int perPage  = rowsPerPage * 2; // 2 columns
 
@@ -196,7 +197,7 @@ public class GuiGirlInteract extends Screen {
             int col    = i / halfPage;
             int row    = i % halfPage;
             int x      = cx + (col == 0 ? -BTN_W - 3 : 3);
-            int y      = STATE_TOP_Y + row * GAP;
+            int y      = stateTopY + row * GAP;
             addSkinBtn(x, y, id);
         }
 
@@ -208,7 +209,7 @@ public class GuiGirlInteract extends Screen {
         List<String> setIds = new ArrayList<>(AnimationSetConfig.getAll().keySet());
         if (setIds.isEmpty()) return;
 
-        int usableH  = this.height - STATE_TOP_Y - MARGIN_BOT;
+        int usableH  = this.height - stateTopY - MARGIN_BOT;
         int rowsPerPage = Math.max(1, usableH / GAP);
         int perPage  = rowsPerPage * 2; // 2 columns
 
@@ -225,7 +226,7 @@ public class GuiGirlInteract extends Screen {
             int col    = i / halfPage;
             int row    = i % halfPage;
             int x      = cx + (col == 0 ? -BTN_W - 3 : 3);
-            int y      = STATE_TOP_Y + row * GAP;
+            int y      = stateTopY + row * GAP;
             addAnimSetBtn(x, y, id);
         }
 
@@ -247,6 +248,32 @@ public class GuiGirlInteract extends Screen {
                 btn -> { if (currentPage < pagesTotal - 1) { currentPage++; init(); } }
             ));
         }
+    }
+
+    /**
+     * Lays out a row of same-width buttons centered on screen, wrapping
+     * onto additional rows (also centered) if they don't all fit within
+     * the current screen width — fixes buttons running off-screen on
+     * narrower windows/resolutions instead of assuming a fixed width
+     * always fits. Returns how many rows were used, so the caller can
+     * position whatever comes next below them.
+     */
+    private int layoutButtonRow(int startY, List<BiConsumer<Integer, Integer>> buttons, int btnWidth) {
+        int available = this.width - ROW_MARGIN * 2;
+        int perRow = Math.max(1, Math.min(buttons.size(), (available + 6) / (btnWidth + 6)));
+        int rows = (int) Math.ceil((double) buttons.size() / perRow);
+
+        for (int i = 0; i < buttons.size(); i++) {
+            int row = i / perRow;
+            int col = i % perRow;
+            int itemsInRow = Math.min(perRow, buttons.size() - row * perRow);
+            int rowWidth = itemsInRow * btnWidth + (itemsInRow - 1) * 6;
+            int rowStartX = this.width / 2 - rowWidth / 2;
+            int x = rowStartX + col * (btnWidth + 6);
+            int y = startY + row * GAP;
+            buttons.get(i).accept(x, y);
+        }
+        return rows;
     }
 
     // ── Toggle button helpers ─────────────────────────────────────────────────
@@ -403,7 +430,7 @@ public class GuiGirlInteract extends Screen {
 
         if (entity.isDowned()) {
             drawCenteredString(stack, this.font, "Downed — click Recover to heal her",
-                this.width / 2, STATE_TOP_Y, 0xFFFF5555);
+                this.width / 2, stateTopY, 0xFFFF5555);
         }
 
         // Page indicator (only shown when there are multiple pages)

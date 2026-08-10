@@ -11,14 +11,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * Loads which mob types are allowed to approach and interact with a downed
- * girl from config/girlmod/mob_interact.json — same load-on-first-run/
- * edit-and-/girlmod-reload pattern as StateConfig and SoundMapper.
+ * girl, and which poses each is allowed to trigger, from config/girlmod/
+ * mob_interact.json — same load-on-first-run/edit-and-/girlmod-reload
+ * pattern as StateConfig and SoundMapper.
  *
  * Two modes:
  *   BLACKLIST — every mob is eligible EXCEPT the ones listed (default,
@@ -30,6 +35,13 @@ import java.util.Set;
  * you use their correct registry path (namespace is intentionally not
  * required/checked, so "zombie" matches any mod's "zombie" if such a
  * clash existed — simplest common case is what matters here).
+ *
+ * Which pose (state id) an eligible mob is allowed to trigger for the
+ * downed encounter used to be hardcoded to any state whose animation
+ * name contained "start" — now it's this config's job. "encounterStates"
+ * is the default list any eligible mob can pick from; "perMobEncounterStates"
+ * optionally overrides that per specific mob type, e.g. giving zombies a
+ * different set of allowed poses than skeletons.
  */
 public class MobInteractConfig {
 
@@ -37,6 +49,8 @@ public class MobInteractConfig {
 
     private static Mode mode = Mode.BLACKLIST;
     private static final Set<String> MOBS = new HashSet<>();
+    private static List<String> defaultEncounterStates = new ArrayList<>();
+    private static final Map<String, List<String>> PER_MOB_ENCOUNTER_STATES = new HashMap<>();
 
     /** Load (or first-time create) mob_interact.json. Safe to call multiple times. */
     public static void load() {
@@ -47,6 +61,8 @@ public class MobInteractConfig {
 
         Mode loadedMode = Mode.BLACKLIST;
         Set<String> loadedMobs = new HashSet<>();
+        List<String> loadedDefaultStates = new ArrayList<>();
+        Map<String, List<String>> loadedPerMobStates = new HashMap<>();
 
         try {
             String json = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
@@ -68,9 +84,33 @@ public class MobInteractConfig {
                 }
             }
 
+            if (root.has("encounterStates")) {
+                for (JsonElement el : root.getAsJsonArray("encounterStates")) {
+                    loadedDefaultStates.add(el.getAsString());
+                }
+            }
+
+            if (root.has("perMobEncounterStates")) {
+                JsonObject perMob = root.getAsJsonObject("perMobEncounterStates");
+                for (Map.Entry<String, JsonElement> entry : perMob.entrySet()) {
+                    String mobName = entry.getKey().toLowerCase(Locale.ROOT);
+                    List<String> states = new ArrayList<>();
+                    for (JsonElement el : entry.getValue().getAsJsonArray()) {
+                        states.add(el.getAsString());
+                    }
+                    loadedPerMobStates.put(mobName, states);
+                }
+            }
+
             if (loadedMode == Mode.WHITELIST && loadedMobs.isEmpty()) {
                 System.out.println("[GirlMod] WARNING: mob_interact.json mode is WHITELIST but the "
                     + "'mobs' list is empty — no mob will ever be eligible to approach a downed girl.");
+            }
+
+            if (loadedDefaultStates.isEmpty() && loadedPerMobStates.isEmpty()) {
+                System.out.println("[GirlMod] WARNING: mob_interact.json has no 'encounterStates' and no "
+                    + "'perMobEncounterStates' — mob-triggered downed encounters will always fall back to "
+                    + "the generic DOWNED animation, never a reused pose.");
             }
 
         } catch (IOException e) {
@@ -80,7 +120,12 @@ public class MobInteractConfig {
         mode = loadedMode;
         MOBS.clear();
         MOBS.addAll(loadedMobs);
-        System.out.println("[GirlMod] Loaded mob_interact.json: mode=" + mode + ", " + MOBS.size() + " entries");
+        defaultEncounterStates = loadedDefaultStates;
+        PER_MOB_ENCOUNTER_STATES.clear();
+        PER_MOB_ENCOUNTER_STATES.putAll(loadedPerMobStates);
+        System.out.println("[GirlMod] Loaded mob_interact.json: mode=" + mode + ", " + MOBS.size() + " mob entries, "
+            + defaultEncounterStates.size() + " default encounter states, "
+            + PER_MOB_ENCOUNTER_STATES.size() + " per-mob overrides");
     }
 
     /** Re-read mob_interact.json from disk. Call this from /girlmod reload. */
@@ -93,6 +138,18 @@ public class MobInteractConfig {
         String key = mobRegistryName == null ? "" : mobRegistryName.toLowerCase(Locale.ROOT);
         boolean listed = MOBS.contains(key);
         return mode == Mode.WHITELIST ? listed : !listed;
+    }
+
+    /**
+     * State ids the given mob is allowed to trigger for a downed
+     * encounter — the per-mob override if one exists, otherwise the
+     * global "encounterStates" default. Replaces the old hardcoded
+     * "any state whose animation name contains 'start'" behavior.
+     */
+    public static List<String> getEncounterStates(String mobRegistryName) {
+        String key = mobRegistryName == null ? "" : mobRegistryName.toLowerCase(Locale.ROOT);
+        List<String> override = PER_MOB_ENCOUNTER_STATES.get(key);
+        return override != null ? override : defaultEncounterStates;
     }
 
     private static Path getConfigPath() {

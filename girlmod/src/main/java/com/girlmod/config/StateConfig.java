@@ -164,25 +164,6 @@ public class StateConfig {
         return groups;
     }
 
-    /**
-     * All state ids whose *animation name* contains the given substring
-     * (case-insensitive) — e.g. "start" matches COWGIRL_START
-     * (animation.ellie.cowgirlstart) and MISSIONARY_START
-     * (animation.ellie.missionary_start). Used to pick a random existing
-     * pose to reuse for a mob encounter rather than requiring dedicated
-     * per-mob animations/states.
-     */
-    public static List<String> getIdsWithAnimationContaining(String substring) {
-        List<String> result = new ArrayList<>();
-        String needle = substring.toLowerCase(Locale.ROOT);
-        for (StateDefinition def : STATES.values()) {
-            if (def.animName != null && def.animName.toLowerCase(Locale.ROOT).contains(needle)) {
-                result.add(def.id);
-            }
-        }
-        return result;
-    }
-
     // ── internals ────────────────────────────────────────────────────────────
 
     private static Path getConfigPath() {

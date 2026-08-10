@@ -61,6 +61,7 @@ import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -393,25 +394,31 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         }
     }
 
-    /** Substring matched against StateDefinition.animName to find poses to reuse for a mob encounter — see applyMobIdentity(). */
-    private static final String MOB_ENCOUNTER_ANIM_KEYWORD = "start";
-
     /**
      * Adopts a mob's identity for the duration of the downed sequence: the
      * partner-rig texture switches to textures/player/<mobName>.png if
      * that file exists (falls back to the default player skin otherwise —
-     * see GirlModel), and one of the existing "start" poses (COWGIRL_START,
-     * MISSIONARY_START, ...) is picked at random to reuse instead of the
-     * generic DOWNED animation, if any exist. No new states/animations
-     * are required per mob type — only a matching player-skin PNG if you
-     * want her to actually look like that mob during the scene.
+     * see GirlModel), and one of that mob's allowed encounter poses (see
+     * MobInteractConfig#getEncounterStates — configurable per mob type in
+     * mob_interact.json, previously hardcoded to any state whose animation
+     * name contained "start") is picked at random to reuse instead of the
+     * generic DOWNED animation, if any are configured. No new states/
+     * animations are required per mob type — only a matching player-skin
+     * PNG if you want her to actually look like that mob during the scene.
      */
     private void applyMobIdentity(MobEntity mob) {
         String key = registryKeyOf(mob);
         setPartnerSkinKey(key);
         attachMob(mob);
 
-        List<String> matches = StateConfig.getIdsWithAnimationContaining(MOB_ENCOUNTER_ANIM_KEYWORD);
+        List<String> allowed = MobInteractConfig.getEncounterStates(key);
+        List<String> matches = new ArrayList<>();
+        for (String id : allowed) {
+            if (StateConfig.exists(id)) matches.add(id);
+            else System.out.println("[GirlMod] WARNING: mob_interact.json allows encounter state '" + id
+                + "' for '" + key + "' but no such state exists in states.json — ignoring it.");
+        }
+
         if (matches.isEmpty()) {
             if (!getStateId().equals("DOWNED")) setState("DOWNED");
             return;
@@ -422,11 +429,19 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     }
 
     /**
-     * Hides the interacting mob and freezes its AI so it visually
-     * "disappears" and is represented entirely by the reskinned partner
-     * rig instead of standing there as a separate, still-visible entity.
-     * Pinned to her exact position each tick while attached (see tick()).
+     * Hides the interacting mob, freezes its AI, and makes it fully
+     * un-attackable/un-interactable so it visually "disappears" and is
+     * represented entirely by the reskinned partner rig instead of
+     * standing there as a separate entity a player could still click or
+     * hit (being invisible alone doesn't remove its hitbox — it can still
+     * be attacked/interacted with at its exact location otherwise).
+     * Moved far below her position (same X/Z column, so no chunk-loading
+     * concerns) rather than pinned exactly at her position, so it's
+     * physically out of reach rather than just invisible there — kept in
+     * sync each tick while attached (see tick()).
      */
+    private static final double ATTACHED_MOB_Y_OFFSET = -300.0;
+
     private void attachMob(MobEntity mob) {
         if (attachedMob == mob) return; // already attached to this one
         if (attachedMob != null) detachMob(); // release whichever mob we had before
@@ -435,7 +450,8 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         mob.setInvisible(true);
         mob.setNoAi(true);
         mob.setSilent(true);
-        mob.setPos(this.getX(), this.getY(), this.getZ());
+        mob.setInvulnerable(true);
+        mob.setPos(this.getX(), this.getY() + ATTACHED_MOB_Y_OFFSET, this.getZ());
     }
 
     /** Restores whichever mob is currently attached (if it's still alive) and clears the reference. */
@@ -445,6 +461,10 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
             attachedMob.setInvisible(false);
             attachedMob.setNoAi(false);
             attachedMob.setSilent(false);
+            attachedMob.setInvulnerable(false);
+            // Bring it back up to her position (not hers exactly, to avoid
+            // spawning inside her) rather than leaving it stranded far below the world.
+            attachedMob.setPos(this.getX() + 1, this.getY(), this.getZ());
         }
         attachedMob = null;
     }
@@ -634,13 +654,14 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
 
             if (isDowned()) {
                 downedTicks++;
-                // Keep the attached mob (if any) pinned to her position and
-                // hidden for as long as the encounter lasts.
+                // Keep the attached mob (if any) hidden and out of reach
+                // (far below her, same X/Z column) for as long as the
+                // encounter lasts.
                 if (attachedMob != null) {
                     if (!attachedMob.isAlive()) {
                         attachedMob = null; // it died/was removed elsewhere; drop the stale reference
                     } else {
-                        attachedMob.setPos(this.getX(), this.getY(), this.getZ());
+                        attachedMob.setPos(this.getX(), this.getY() + ATTACHED_MOB_Y_OFFSET, this.getZ());
                     }
                 }
                 // Actively guide an eligible, downed-aware mob toward her
