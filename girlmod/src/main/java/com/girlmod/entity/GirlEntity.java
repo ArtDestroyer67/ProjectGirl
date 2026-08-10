@@ -2,6 +2,7 @@ package com.girlmod.entity;
 
 import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
+import com.girlmod.config.MobInteractConfig;
 import com.girlmod.client.effect.ClientEffects;
 import com.girlmod.entity.goal.CustomBowAttackGoal;
 import com.girlmod.entity.goal.FollowPlayerGoal;
@@ -101,10 +102,21 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     private static final DataParameter<String> PARTNER_SKIN_KEY =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
 
-    /** Radius used both to find a mob to "blame" for a downed sequence and to re-check for one each second while downed. */
-    private static final double MOB_INTERACT_RADIUS = 6.0;
+    /**
+     * Distance an eligible mob must actually close to before the
+     * interaction/encounter triggers — "2 distance block" per the request.
+     */
+    private static final double MOB_INTERACT_RADIUS = 2.0;
+    /**
+     * How far away an eligible mob can be noticed at all while she's
+     * downed, and start walking toward her (see approachEligibleMob()).
+     * Line-of-sight is also required — "the mob that see girl downed".
+     */
+    private static final double MOB_DETECT_RADIUS = 16.0;
     /** Radius within which hostile mobs get un-targeted from her while she's busy (animation playing). */
     private static final double MOB_IGNORE_RADIUS = 12.0;
+    /** How fast an approaching mob walks toward her — matches typical hostile-mob walk speed. */
+    private static final double MOB_APPROACH_SPEED = 1.0;
 
     private int downedTicks = 0;
     // The mob currently "attached" to her for a downed encounter — hidden,
@@ -331,9 +343,12 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         downedTicks = 0;
 
         Entity attacker = source.getEntity();
-        MonsterEntity mob = (attacker instanceof MonsterEntity)
-            ? (MonsterEntity) attacker
-            : findNearestMonster(MOB_INTERACT_RADIUS);
+        MonsterEntity mob = null;
+        if (attacker instanceof MonsterEntity && MobInteractConfig.isEligible(registryKeyOf(attacker))) {
+            mob = (MonsterEntity) attacker;
+        } else {
+            mob = findNearestEligibleMonster(MOB_INTERACT_RADIUS);
+        }
 
         if (mob != null) {
             applyMobIdentity(mob);
@@ -404,12 +419,14 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         return id != null ? id.getPath() : "unknown";
     }
 
-    private MonsterEntity findNearestMonster(double radius) {
+    /** Nearest monster within radius that passes MobInteractConfig's whitelist/blacklist filter. */
+    private MonsterEntity findNearestEligibleMonster(double radius) {
         List<MonsterEntity> nearby =
             this.level.getEntitiesOfClass(MonsterEntity.class, this.getBoundingBox().inflate(radius));
         MonsterEntity closest = null;
         double closestDistSq = Double.MAX_VALUE;
         for (MonsterEntity m : nearby) {
+            if (!MobInteractConfig.isEligible(registryKeyOf(m))) continue;
             double d = m.distanceToSqr(this);
             if (d < closestDistSq) {
                 closestDistSq = d;
@@ -417,6 +434,24 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
             }
         }
         return closest;
+    }
+
+    /**
+     * While downed, looks for an eligible mob within MOB_DETECT_RADIUS that
+     * can actually see her, and either walks it toward her (if still
+     * further than MOB_INTERACT_RADIUS) or starts the encounter (if it's
+     * already within range). Called every tick while downed and not
+     * already mid-encounter with an attached mob — see tick().
+     */
+    private void approachEligibleMob() {
+        MonsterEntity mob = findNearestEligibleMonster(MOB_DETECT_RADIUS);
+        if (mob == null || !mob.hasLineOfSight(this)) return;
+
+        if (mob.distanceToSqr(this) <= MOB_INTERACT_RADIUS * MOB_INTERACT_RADIUS) {
+            applyMobIdentity(mob);
+        } else {
+            mob.getNavigation().moveTo(this, MOB_APPROACH_SPEED);
+        }
     }
 
     /** Un-targets any nearby hostile mob currently targeting her — see tick(). */
@@ -566,20 +601,18 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
                         attachedMob.setPos(this.getX(), this.getY(), this.getZ());
                     }
                 }
-                // Re-check for a nearby mob once a second so a mob that
-                // wanders in after the downed sequence already started
-                // (e.g. she was downed by fall damage, not an attack)
-                // still gets picked up and swaps in its identity/animation.
-                // Only re-triggers for a genuinely NEW mob (attachedMob
-                // changed) — otherwise, once she's progressed past the
-                // "start" pose into its normal followUp (e.g. COWGIRL_SLOW,
-                // which doesn't match the "start" filter), this would keep
-                // yanking her back into a fresh COWGIRL_START every second.
-                if (downedTicks % 20 == 0) {
-                    MonsterEntity nearby = findNearestMonster(MOB_INTERACT_RADIUS);
-                    if (nearby != null && nearby != attachedMob) {
-                        applyMobIdentity(nearby);
-                    }
+                // Actively guide an eligible, downed-aware mob toward her
+                // until it's close enough to interact — only while nothing
+                // is attached yet; once a mob is attached the encounter is
+                // already underway and shouldn't be disturbed by also
+                // trying to find/approach a different one. Throttled to
+                // every 10 ticks (0.5s): re-issuing a pathfind command
+                // every single tick is unnecessary — PathNavigator keeps
+                // walking an already-set path on its own — and this still
+                // reacts quickly enough to her moving or the path needing
+                // to be recalculated around an obstacle.
+                if (attachedMob == null && downedTicks % 10 == 0) {
+                    approachEligibleMob();
                 }
                 // No automatic recovery: she stays downed/invincible and
                 // ignored by mobs indefinitely — the only way out is a
