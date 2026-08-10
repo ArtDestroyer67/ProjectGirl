@@ -388,7 +388,7 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
                 stack.translate(WEAPON_OFFSET_X, WEAPON_OFFSET_Y, WEAPON_OFFSET_Z);
                 stack.scale(WEAPON_SCALE, WEAPON_SCALE, WEAPON_SCALE);
 
-                Minecraft.getInstance().getItemRenderer().renderItem(
+                Minecraft.getInstance().getItemRenderer().renderStatic(
                     heldItem, ItemCameraTransforms.TransformType.THIRD_PERSON_RIGHT_HAND,
                     packedLightIn, packedOverlayIn, stack, this.rtb
                 );

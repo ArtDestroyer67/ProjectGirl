@@ -453,7 +453,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
      */
     private void approachEligibleMob() {
         MobEntity mob = findNearestEligibleMob(MOB_DETECT_RADIUS);
-        if (mob == null || !mob.hasLineOfSight(this)) return;
+        if (mob == null || !mob.canSee(this)) return;
 
         if (mob.distanceToSqr(this) <= MOB_INTERACT_RADIUS * MOB_INTERACT_RADIUS) {
             applyMobIdentity(mob);

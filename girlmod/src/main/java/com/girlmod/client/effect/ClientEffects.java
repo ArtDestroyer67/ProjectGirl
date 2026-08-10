@@ -8,8 +8,8 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
  * Client-side visual effects triggered from animation keyframes — see
@@ -116,10 +116,10 @@ public class ClientEffects {
     // ── Applying the camera zoom ─────────────────────────────────────────────
 
     @SubscribeEvent
-    public static void onFov(EntityViewRenderEvent.FieldOfView event) {
+    public static void onFov(EntityViewRenderEvent.FOVModifier event) {
         if (zoomTicksLeft <= 0) return;
         float t = zoomTicksLeft / (float) ZOOM_DURATION_TICKS; // 1 -> 0 over the effect's duration
-        double narrowing = 1.0 - (zoomStrength * 0.3 * t);
+        float narrowing = 1.0f - (zoomStrength * 0.3f * t);
         event.setFOV(event.getFOV() * narrowing);
     }
 }
