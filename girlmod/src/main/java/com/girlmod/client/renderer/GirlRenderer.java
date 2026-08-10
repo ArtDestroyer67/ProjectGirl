@@ -4,12 +4,19 @@ import com.girlmod.client.model.GirlModel;
 import com.girlmod.entity.GirlEntity;
 import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.vertex.IVertexBuilder;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.IRenderTypeBuffer;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererManager;
+import net.minecraft.client.renderer.model.ItemCameraTransforms;
+import net.minecraft.inventory.EquipmentSlotType;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.vector.Vector3f;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import software.bernie.geckolib3.core.processor.IBone;
+import software.bernie.geckolib3.geo.render.built.GeoBone;
 import software.bernie.geckolib3.model.AnimatedGeoModel;
 import software.bernie.geckolib3.renderers.geo.GeoEntityRenderer;
 
@@ -55,6 +62,24 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
      */
     private static final String PARTNER_RIG_BONE = "steve";
 
+    /**
+     * Bone name in girl.geo.json/girl_dressed.geo.json that acts as the
+     * mainhand attachment point — see mobInteract's weapon-equip shift-
+     * click and renderRecursively() below, which draws whatever's in
+     * EquipmentSlotType.MAINHAND at this bone's transform each frame.
+     */
+    private static final String WEAPON_BONE = "weapon";
+
+    // Stashed in renderEarly so renderRecursively can hand it back to
+    // GeckoLib after rendering the held item — required per GeckoLib's own
+    // documented pattern for this (the render-type buffer GeckoLib expects
+    // to keep writing into gets swapped out while item rendering runs).
+    private IRenderTypeBuffer rtb;
+    // renderRecursively() doesn't receive the entity as a parameter in
+    // this GeckoLib version, so we stash it ourselves at the top of our
+    // own render() override (which does receive it) for use there.
+    private GirlEntity currentEntity;
+
     public GirlRenderer(EntityRendererManager manager) {
         this(manager, new GirlModel());
     }
@@ -99,6 +124,8 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
     public void render(GirlEntity entity, float entityYaw, float partialTicks,
                         MatrixStack matrixStackIn, IRenderTypeBuffer bufferIn,
                         int packedLightIn) {
+
+        this.currentEntity = entity; // see field comment — needed by renderRecursively()
 
         @SuppressWarnings("unchecked")
         AnimatedGeoModel<GirlEntity> animatedModel =
@@ -162,6 +189,8 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
         super.renderEarly(entity, stack, ticks, renderTypeBuffer, vertexBuilder,
                           packedLightIn, packedOverlayIn, red, green, blue, alpha);
 
+        this.rtb = renderTypeBuffer; // needed by renderRecursively() below to draw the held weapon
+
         // Only applies to the dressed model — nude model has no armor bones
         if (!entity.isDressed()) return;
 
@@ -195,5 +224,62 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
         // It's now controlled by render() below, which needs to flip it
         // between two full render passes (one per texture) rather than
         // once per frame — see render() for details.
+    }
+
+    // Tweak these if the sword looks offset/rotated wrong in-game — the
+    // "weapon" bone's own local orientation in the geo file doesn't
+    // necessarily line up with how Minecraft's item renderer expects to
+    // draw a third-person held item, so some correction is normal and
+    // expected to need adjusting by eye. These starting values are an
+    // educated guess (not visually verified), following the same
+    // corrective-rotation pattern GeckoLib mods commonly need for a
+    // Blockbench hand/arm bone — expect to nudge them.
+    private static final float  WEAPON_ROT_X_DEG = -90f;
+    private static final float  WEAPON_ROT_Y_DEG = 0f;
+    private static final float  WEAPON_ROT_Z_DEG = 0f;
+    private static final double WEAPON_OFFSET_X  = 0.0;
+    private static final double WEAPON_OFFSET_Y  = 0.0;
+    private static final double WEAPON_OFFSET_Z  = 0.0;
+    private static final float  WEAPON_SCALE     = 1.0f;
+
+    /**
+     * GeckoLib calls this once per bone during the render walk, with the
+     * MatrixStack already translated/rotated to that specific bone's
+     * current (posed, animated) transform — see the GeckoLib "render item
+     * in hand" pattern this follows. We hook the "weapon" bone specifically
+     * and draw whatever real vanilla item is in her MAINHAND slot there,
+     * via Minecraft's own ItemRenderer — so it's always whatever actual
+     * item/sword she has equipped, not a custom model.
+     */
+    @Override
+    public void renderRecursively(GeoBone bone, MatrixStack stack, IVertexBuilder bufferIn,
+                                   int packedLightIn, int packedOverlayIn,
+                                   float red, float green, float blue, float partialTicks) {
+
+        if (bone.getName().equals(WEAPON_BONE) && currentEntity != null) {
+            ItemStack heldItem = currentEntity.getItemBySlot(EquipmentSlotType.MAINHAND);
+            if (!heldItem.isEmpty()) {
+                stack.pushPose();
+                stack.mulPose(Vector3f.XP.rotationDegrees(WEAPON_ROT_X_DEG));
+                stack.mulPose(Vector3f.YP.rotationDegrees(WEAPON_ROT_Y_DEG));
+                stack.mulPose(Vector3f.ZP.rotationDegrees(WEAPON_ROT_Z_DEG));
+                stack.translate(WEAPON_OFFSET_X, WEAPON_OFFSET_Y, WEAPON_OFFSET_Z);
+                stack.scale(WEAPON_SCALE, WEAPON_SCALE, WEAPON_SCALE);
+
+                Minecraft.getInstance().getItemRenderer().renderItem(
+                    heldItem, ItemCameraTransforms.TransformType.THIRD_PERSON_RIGHT_HAND,
+                    packedLightIn, packedOverlayIn, stack, this.rtb
+                );
+                stack.popPose();
+
+                // GeckoLib expects to keep writing into its own vertex
+                // builder for this bone afterward — restore it to the
+                // current texture's RenderType, same as the reference
+                // pattern this follows.
+                bufferIn = this.rtb.getBuffer(RenderType.entityCutoutNoCull(this.getTextureLocation(currentEntity)));
+            }
+        }
+
+        super.renderRecursively(bone, stack, bufferIn, packedLightIn, packedOverlayIn, red, green, blue, partialTicks);
     }
 }

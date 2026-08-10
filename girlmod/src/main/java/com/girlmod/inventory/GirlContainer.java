@@ -9,26 +9,37 @@ import net.minecraft.inventory.EquipmentSlotType;
 import net.minecraft.inventory.container.Container;
 import net.minecraft.inventory.container.Slot;
 import net.minecraft.item.ArmorItem;
+import net.minecraft.item.BowItem;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.SwordItem;
 import net.minecraft.network.PacketBuffer;
 
 /**
- * Armor/inventory screen for a GirlEntity — 4 armor slots bound to her real
- * equipment (GirlEquipmentInventory) plus the player's own 27+9 inventory
- * slots, laid out at the exact same coordinates vanilla's own inventory
- * screen uses so the shared inventory.png background lines up (see
- * GirlContainerScreen).
+ * Armor/inventory screen for a GirlEntity — 4 armor slots + 1 mainhand
+ * weapon slot bound to her real equipment (GirlEquipmentInventory /
+ * GirlSingleEquipmentSlotInventory) plus the player's own 27+9 inventory
+ * slots. Armor slots are laid out at the exact same coordinates vanilla's
+ * own inventory screen uses so the shared inventory.png background lines
+ * up (see GirlContainerScreen); the weapon slot has no matching art in
+ * that texture so it renders as a plain unframed slot.
  */
 public class GirlContainer extends Container {
 
+    /** Slot index of the mainhand weapon slot — right after the 4 armor slots (0-3). */
+    private static final int WEAPON_SLOT_INDEX = GirlEquipmentInventory.ARMOR_SLOTS.length; // 4
+    /** Total slots owned by this container before the player's own inventory starts. */
+    private static final int SPECIAL_SLOT_COUNT = WEAPON_SLOT_INDEX + 1; // 4 armor + 1 weapon = 5
+
     public final GirlEntity girl;
     private final GirlEquipmentInventory equipment;
+    private final GirlSingleEquipmentSlotInventory mainHand;
 
     /** Server-side / logical constructor. */
     public GirlContainer(int windowId, PlayerInventory playerInv, GirlEntity girl) {
         super(ModContainers.GIRL_CONTAINER.get(), windowId);
         this.girl = girl;
         this.equipment = new GirlEquipmentInventory(girl);
+        this.mainHand  = new GirlSingleEquipmentSlotInventory(girl, EquipmentSlotType.MAINHAND);
 
         // Armor slots — same x/y and top-to-bottom order (HEAD..FEET) as
         // vanilla's own inventory screen.
@@ -36,6 +47,11 @@ public class GirlContainer extends Container {
         for (int i = 0; i < slots.length; i++) {
             this.addSlot(new ArmorSlot(equipment, i, 8, 8 + i * 18, slots[i]));
         }
+
+        // Mainhand weapon slot — placed near vanilla's own off-hand slot
+        // position; unrestricted (accepts anything, matching how vanilla's
+        // own mainhand slot behaves), same as this.addSlot(new Slot(...)).
+        this.addSlot(new Slot(mainHand, 0, 77, 62));
 
         // Player's own inventory (3x9 main + hotbar), positioned exactly
         // like vanilla's inventory screen so it lines up with inventory.png.
@@ -64,7 +80,13 @@ public class GirlContainer extends Container {
         return girl.isAlive() && player.distanceToSqr(girl) <= 64.0;
     }
 
-    /** Shift-click: armor slot -> player inventory, or player inventory -> matching armor slot if empty. */
+    /**
+     * Shift-click:
+     *  - armor/weapon slot  -> player inventory
+     *  - player inventory   -> matching armor slot if it's an ArmorItem,
+     *                           else the weapon slot if it's a sword/bow,
+     *                           else just shuffled within the player inventory
+     */
     @Override
     public ItemStack quickMoveStack(PlayerEntity player, int index) {
         Slot slot = this.slots.get(index);
@@ -73,28 +95,32 @@ public class GirlContainer extends Container {
         ItemStack original = slot.getItem();
         ItemStack moving   = original.copy();
 
-        int armorSlotCount  = GirlEquipmentInventory.ARMOR_SLOTS.length; // 4
-        int playerInvStart  = armorSlotCount;
-        int playerInvEnd    = this.slots.size(); // 4 + 36
+        int armorSlotCount = GirlEquipmentInventory.ARMOR_SLOTS.length; // 4
+        int playerInvStart = SPECIAL_SLOT_COUNT;
+        int playerInvEnd   = this.slots.size();
 
-        if (index < armorSlotCount) {
-            // From an armor slot -> into the player's inventory
+        if (index < SPECIAL_SLOT_COUNT) {
+            // From an armor or weapon slot -> into the player's inventory
             if (!this.moveItemStackTo(original, playerInvStart, playerInvEnd, true)) {
                 return ItemStack.EMPTY;
             }
         } else {
-            // From the player's inventory -> try the matching armor slot first
-            boolean movedToArmor = false;
+            // From the player's inventory -> try the matching armor slot,
+            // then the weapon slot if it's a sword/bow, before falling
+            // back to just shuffling within the player's own inventory.
+            boolean movedToSpecial = false;
             if (original.getItem() instanceof ArmorItem) {
                 ArmorItem armor = (ArmorItem) original.getItem();
                 for (int i = 0; i < armorSlotCount; i++) {
                     if (GirlEquipmentInventory.ARMOR_SLOTS[i] == armor.getSlot()) {
-                        movedToArmor = this.moveItemStackTo(original, i, i + 1, false);
+                        movedToSpecial = this.moveItemStackTo(original, i, i + 1, false);
                         break;
                     }
                 }
+            } else if (original.getItem() instanceof SwordItem || original.getItem() instanceof BowItem) {
+                movedToSpecial = this.moveItemStackTo(original, WEAPON_SLOT_INDEX, WEAPON_SLOT_INDEX + 1, false);
             }
-            if (!movedToArmor && !this.moveItemStackTo(original, playerInvStart, playerInvEnd, false)) {
+            if (!movedToSpecial && !this.moveItemStackTo(original, playerInvStart, playerInvEnd, false)) {
                 return ItemStack.EMPTY;
             }
         }
