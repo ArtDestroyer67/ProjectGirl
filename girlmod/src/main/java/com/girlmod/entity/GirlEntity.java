@@ -22,6 +22,7 @@ import net.minecraft.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.entity.ai.goal.NearestAttackableTargetGoal;
 import net.minecraft.entity.ai.goal.RandomWalkingGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
+import net.minecraft.entity.MobEntity;
 import net.minecraft.entity.monster.MonsterEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
@@ -124,7 +125,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     // applyMobIdentity/detachMob). Not persisted across a world reload;
     // if that happens mid-encounter the mob just stays hidden/frozen where
     // it was until she's manually recovered (rare edge case).
-    private MonsterEntity attachedMob;
+    private MobEntity attachedMob;
 
     private final AnimationFactory factory = new AnimationFactory(this);
     private final Random random = new Random();
@@ -343,11 +344,11 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         downedTicks = 0;
 
         Entity attacker = source.getEntity();
-        MonsterEntity mob = null;
-        if (attacker instanceof MonsterEntity && MobInteractConfig.isEligible(registryKeyOf(attacker))) {
-            mob = (MonsterEntity) attacker;
+        MobEntity mob = null;
+        if (attacker instanceof MobEntity && MobInteractConfig.isEligible(registryKeyOf(attacker))) {
+            mob = (MobEntity) attacker;
         } else {
-            mob = findNearestEligibleMonster(MOB_INTERACT_RADIUS);
+            mob = findNearestEligibleMob(MOB_INTERACT_RADIUS);
         }
 
         if (mob != null) {
@@ -371,7 +372,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
      * are required per mob type — only a matching player-skin PNG if you
      * want her to actually look like that mob during the scene.
      */
-    private void applyMobIdentity(MonsterEntity mob) {
+    private void applyMobIdentity(MobEntity mob) {
         String key = registryKeyOf(mob);
         setPartnerSkinKey(key);
         attachMob(mob);
@@ -392,7 +393,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
      * rig instead of standing there as a separate, still-visible entity.
      * Pinned to her exact position each tick while attached (see tick()).
      */
-    private void attachMob(MonsterEntity mob) {
+    private void attachMob(MobEntity mob) {
         if (attachedMob == mob) return; // already attached to this one
         if (attachedMob != null) detachMob(); // release whichever mob we had before
 
@@ -419,13 +420,20 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         return id != null ? id.getPath() : "unknown";
     }
 
-    /** Nearest monster within radius that passes MobInteractConfig's whitelist/blacklist filter. */
-    private MonsterEntity findNearestEligibleMonster(double radius) {
-        List<MonsterEntity> nearby =
-            this.level.getEntitiesOfClass(MonsterEntity.class, this.getBoundingBox().inflate(radius));
-        MonsterEntity closest = null;
+    /**
+     * Nearest mob within radius that passes MobInteractConfig's whitelist/
+     * blacklist filter — any AI-driven mob (MobEntity), hostile, passive,
+     * or neutral, not just MonsterEntity/hostile ones. Excludes herself
+     * and any other GirlEntity, so she never tries to "interact" with
+     * another girl.
+     */
+    private MobEntity findNearestEligibleMob(double radius) {
+        List<MobEntity> nearby =
+            this.level.getEntitiesOfClass(MobEntity.class, this.getBoundingBox().inflate(radius));
+        MobEntity closest = null;
         double closestDistSq = Double.MAX_VALUE;
-        for (MonsterEntity m : nearby) {
+        for (MobEntity m : nearby) {
+            if (m == this || m instanceof GirlEntity) continue;
             if (!MobInteractConfig.isEligible(registryKeyOf(m))) continue;
             double d = m.distanceToSqr(this);
             if (d < closestDistSq) {
@@ -444,7 +452,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
      * already mid-encounter with an attached mob — see tick().
      */
     private void approachEligibleMob() {
-        MonsterEntity mob = findNearestEligibleMonster(MOB_DETECT_RADIUS);
+        MobEntity mob = findNearestEligibleMob(MOB_DETECT_RADIUS);
         if (mob == null || !mob.hasLineOfSight(this)) return;
 
         if (mob.distanceToSqr(this) <= MOB_INTERACT_RADIUS * MOB_INTERACT_RADIUS) {
