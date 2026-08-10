@@ -1,5 +1,6 @@
 package com.girlmod;
 
+import com.girlmod.client.effect.ClientEffects;
 import com.girlmod.client.gui.GirlContainerScreen;
 import com.girlmod.client.renderer.GirlRenderer;
 import com.girlmod.config.StateConfig;
@@ -73,6 +74,7 @@ public class GirlMod {
         event.enqueueWork(() ->
             ScreenManager.register(ModContainers.GIRL_CONTAINER.get(), GirlContainerScreen::new)
         );
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(ClientEffects.class);
     }
 
     private void onAttributeCreate(EntityAttributeCreationEvent event) {

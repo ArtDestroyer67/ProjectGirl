@@ -2,6 +2,7 @@ package com.girlmod.entity;
 
 import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
+import com.girlmod.client.effect.ClientEffects;
 import com.girlmod.entity.goal.CustomBowAttackGoal;
 import com.girlmod.entity.goal.FollowPlayerGoal;
 import com.girlmod.entity.goal.IdleGatedGoal;
@@ -715,11 +716,44 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     }
 
     private <E extends IAnimatable> void onSoundKeyframe(SoundKeyframeEvent<E> event) {
+        dispatchEffectKeyframe(event.sound);
+
         SoundEvent sound = SoundMapper.resolve(event.sound);
         if (sound == null) return;
+
+        // Heart particles: a small ambient touch on top of an actual voice
+        // line firing during a romantic (hasPlayer) state — reuses the
+        // existing keyframe dispatch rather than needing dedicated "heart"
+        // keyframes added to every animation.
+        if (getStateDef().hasPlayer) {
+            ClientEffects.spawnHearts(this.level, this.getX(), this.getY() + 1.6, this.getZ());
+        }
+
         this.level.playLocalSound(
             this.getX(), this.getY(), this.getZ(),
             sound, SoundCategory.NEUTRAL, 1.0f, 1.0f, false
         );
+    }
+
+    /**
+     * Keyframe names that trigger a client-visual effect rather than (or
+     * in addition to) a sound — these already exist in sound_mappings.json's
+     * nonSoundEffects list and fire during animation playback, but did
+     * nothing until now. See ClientEffects for the actual effect code.
+     */
+    private void dispatchEffectKeyframe(String effectName) {
+        switch (effectName) {
+            case "blackScreen":
+                ClientEffects.triggerBlackout();
+                break;
+            case "carry_introCam":
+                ClientEffects.triggerCameraZoom(1.0f);
+                break;
+            case "carry_introCam2":
+                ClientEffects.triggerCameraZoom(1.6f);
+                break;
+            default:
+                break;
+        }
     }
 }
