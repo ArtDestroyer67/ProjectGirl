@@ -133,6 +133,11 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     private static final double MOB_APPROACH_SPEED = 1.0;
 
     private int downedTicks = 0;
+    // Her exact yaw the moment the current state began — see setState()
+    // and tick()'s rotation freeze below. Applied every tick while
+    // isBusy() so she can't drift/rotate mid-animation (residual look-
+    // control, knockback turning, etc), regardless of what set it off.
+    private float lockedYaw = 0f;
     // The mob currently "attached" to her for a downed encounter — hidden,
     // AI-frozen, and pinned to her position for the duration (see
     // applyMobIdentity/detachMob). Not persisted across a world reload;
@@ -435,12 +440,19 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
      * standing there as a separate entity a player could still click or
      * hit (being invisible alone doesn't remove its hitbox — it can still
      * be attacked/interacted with at its exact location otherwise).
-     * Moved far below her position (same X/Z column, so no chunk-loading
+     * Moved well above her position (same X/Z column, so no chunk-loading
      * concerns) rather than pinned exactly at her position, so it's
      * physically out of reach rather than just invisible there — kept in
      * sync each tick while attached (see tick()).
+     *
+     * Offset is UPWARD and clamped to the build height limit — moving it
+     * downward instead (as this used to) risks pushing it below Y=0,
+     * where the server's own out-of-world cleanup can silently remove or
+     * kill an entity regardless of setInvulnerable(true), which is
+     * exactly why the mob wasn't coming back after recovery.
      */
-    private static final double ATTACHED_MOB_Y_OFFSET = -300.0;
+    private static final double ATTACHED_MOB_Y_OFFSET   = 50.0;
+    private static final double WORLD_HEIGHT_LIMIT       = 255.0;
 
     private void attachMob(MobEntity mob) {
         if (attachedMob == mob) return; // already attached to this one
@@ -451,7 +463,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         mob.setNoAi(true);
         mob.setSilent(true);
         mob.setInvulnerable(true);
-        mob.setPos(this.getX(), this.getY() + ATTACHED_MOB_Y_OFFSET, this.getZ());
+        mob.setPos(this.getX(), Math.min(WORLD_HEIGHT_LIMIT, this.getY() + ATTACHED_MOB_Y_OFFSET), this.getZ());
     }
 
     /** Restores whichever mob is currently attached (if it's still alive) and clears the reference. */
@@ -595,6 +607,13 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
                 this.yBodyRot = this.yRot;
             }
         }
+
+        // Captured on every setState() call (harmless for non-locking
+        // states — only actually applied in tick() while isBusy()), so
+        // it always reflects the exact facing she had the moment the
+        // current locking state began, including the hasPlayer snap
+        // above. See tick()'s rotation freeze.
+        this.lockedYaw = this.yRot;
     }
 
     public String getStateId() {
@@ -644,6 +663,14 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         if (!this.level.isClientSide) {
             if (isBusy()) {
                 this.getNavigation().stop(); // belt-and-braces: never let her drift while busy
+                // Rotation freeze: force her yaw back to exactly what it
+                // was when the current animation began, every tick, so
+                // nothing (residual look-control, knockback turning, etc)
+                // can make her visibly rotate while an animation plays.
+                this.yRot     = lockedYaw;
+                this.yRotO    = lockedYaw;
+                this.yBodyRot = lockedYaw;
+                this.yHeadRot = lockedYaw;
                 // Task: mobs ignore her while any animation (other than IDLE/WALK)
                 // is playing — checked every 5 ticks rather than every tick to
                 // keep the entity-scan cheap.
@@ -661,7 +688,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
                     if (!attachedMob.isAlive()) {
                         attachedMob = null; // it died/was removed elsewhere; drop the stale reference
                     } else {
-                        attachedMob.setPos(this.getX(), this.getY() + ATTACHED_MOB_Y_OFFSET, this.getZ());
+                        attachedMob.setPos(this.getX(), Math.min(WORLD_HEIGHT_LIMIT, this.getY() + ATTACHED_MOB_Y_OFFSET), this.getZ());
                     }
                 }
                 // Actively guide an eligible, downed-aware mob toward her

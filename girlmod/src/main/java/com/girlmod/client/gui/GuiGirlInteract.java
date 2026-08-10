@@ -105,19 +105,17 @@ public class GuiGirlInteract extends Screen {
 
         stateTopY = TOGGLE_Y + toggleRows * GAP;
 
-        // ── Pose buttons, paginated (or a Recover button while downed, or
-        //    the skin/anim-set list depending on viewMode) ─────────────────
-        // Pose picking is hidden entirely while downed — she stays downed
-        // indefinitely (no automatic recovery) until a player manually
-        // clicks Recover, sent via PacketRecover. A pose click would be
-        // silently ignored server-side by PacketSetState anyway, so this
-        // avoids showing a grid of buttons that don't do anything.
+        // Recover button — shown ABOVE the pose grid while downed (pushing
+        // everything below it down one row), rather than replacing the
+        // pose grid entirely. Pose picking now works while downed too
+        // (see PacketSetState), so this is an extra option alongside the
+        // normal pose buttons, not the only thing shown.
         if (entity.isDowned()) {
-            pagesTotal = 1;
             addRecoverBtn(cx - BTN_W / 2, stateTopY);
-            return;
+            stateTopY += GAP;
         }
 
+        // ── Skin/anim-set list depending on viewMode ────────────────────────
         if (viewMode == ViewMode.SKINS) {
             buildSkinButtons(cx);
             return;
@@ -424,14 +422,10 @@ public class GuiGirlInteract extends Screen {
             + (entity.isDressed()   ? "  |  Dressed"    : "  |  Nude")
             + (entity.hasAnyArmorEquipped() ? "  |  Armored" : "")
             + (entity.isPartnerForced() ? "  |  Partner Forced" : "")
+            + (entity.isDowned()     ? "  |  Downed"     : "")
             + "  |  Skin: " + SkinConfig.get(entity.getSkinId()).displayName
             + "  |  Anim: " + AnimationSetConfig.get(entity.getAnimationSetId()).displayName;
         drawCenteredString(stack, this.font, status, this.width / 2, 22, 0xFFFFFFFF);
-
-        if (entity.isDowned()) {
-            drawCenteredString(stack, this.font, "Downed — click Recover to heal her",
-                this.width / 2, stateTopY, 0xFFFF5555);
-        }
 
         // Page indicator (only shown when there are multiple pages)
         if (pagesTotal > 1) {
