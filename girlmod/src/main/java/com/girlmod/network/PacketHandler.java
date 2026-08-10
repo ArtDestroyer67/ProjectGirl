@@ -54,5 +54,12 @@ public class PacketHandler {
             PacketSetSkin::decode,
             PacketSetSkin::handle
         );
+        CHANNEL.registerMessage(
+            id++,
+            PacketSetAnimSet.class,
+            PacketSetAnimSet::encode,
+            PacketSetAnimSet::decode,
+            PacketSetAnimSet::handle
+        );
     }
 }

@@ -30,9 +30,6 @@ import java.util.Map;
 @OnlyIn(Dist.CLIENT)
 public class GirlModel extends AnimatedGeoModel<GirlEntity> {
 
-    private static final ResourceLocation ANIM =
-        new ResourceLocation("girlmod", "animations/girl/girl.animation.json");
-
     // Separate sheet for the embedded "steve" partner rig, so it never
     // shares UV space with the girl atlas. Lives in its own folder so it
     // can later be swapped for the real local-player skin if desired.
@@ -95,5 +92,7 @@ public class GirlModel extends AnimatedGeoModel<GirlEntity> {
     }
 
     @Override
-    public ResourceLocation getAnimationFileLocation(GirlEntity entity) { return ANIM; }
+    public ResourceLocation getAnimationFileLocation(GirlEntity entity) {
+        return resourceLocationOf(com.girlmod.config.AnimationSetConfig.get(entity.getAnimationSetId()).animationFile);
+    }
 }

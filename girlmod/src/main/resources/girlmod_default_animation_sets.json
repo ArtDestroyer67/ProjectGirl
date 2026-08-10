@@ -1,0 +1,8 @@
+{
+  "animationSets": {
+    "default": {
+      "displayName": "Default",
+      "animationFile": "animations/girl/girl.animation.json"
+    }
+  }
+}

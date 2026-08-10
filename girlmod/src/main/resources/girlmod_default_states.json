@@ -1,34 +1,34 @@
 {
   "states": {
-    "IDLE":    { "animation": "animation.ellie.idle",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false, "isMovement": true },
-    "WALK":    { "animation": "animation.ellie.walk",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false, "isMovement": true },
-    "SIT":     { "animation": "animation.ellie.sit",     "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": true,  "followUp": null, "showPartnerRig": false },
-    "SITDOWN": { "animation": "animation.ellie.sitdown", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 120, "locksMovement": true, "followUp": "SIT", "showPartnerRig": false },
+    "IDLE":    { "animation": "animation.ellie.idle",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false, "isMovement": true, "group": "Movement", "hidden": false },
+    "WALK":    { "animation": "animation.ellie.walk",    "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": false, "followUp": null, "showPartnerRig": false, "isMovement": true, "group": "Movement", "hidden": false },
+    "SIT":     { "animation": "animation.ellie.sit",     "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": true,  "followUp": null, "showPartnerRig": false, "group": "Affection", "hidden": false },
+    "SITDOWN": { "animation": "animation.ellie.sitdown", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 120, "locksMovement": true, "followUp": "SIT", "showPartnerRig": false, "group": "Affection", "hidden": false },
 
-    "HUG":     { "animation": "animation.ellie.hug",     "loopType": "HOLD_ON_LAST_FRAME", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false },
-    "HUGIDLE": { "animation": "animation.ellie.hugidle", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false },
-    "STRIP":   { "animation": "animation.ellie.strip",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 100, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": false },
+    "HUG":     { "animation": "animation.ellie.hug",     "loopType": "HOLD_ON_LAST_FRAME", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false, "group": "Affection", "hidden": false },
+    "HUGIDLE": { "animation": "animation.ellie.hugidle", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false, "group": "Affection", "hidden": false },
+    "STRIP":   { "animation": "animation.ellie.strip",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 100, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": false, "group": "Misc", "hidden": false },
 
-    "COWGIRL_START": { "animation": "animation.ellie.cowgirlstart", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 320, "locksMovement": true, "followUp": "COWGIRL_SLOW", "showPartnerRig": true },
-    "COWGIRL_SLOW":  { "animation": "animation.ellie.cowgirlslow2", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true },
-    "COWGIRL_FAST":  { "animation": "animation.ellie.cowgirlfast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true },
-    "COWGIRL_CUM":   { "animation": "animation.ellie.cowgirlcum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 300, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": true },
+    "COWGIRL_START": { "animation": "animation.ellie.cowgirlstart", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 320, "locksMovement": true, "followUp": "COWGIRL_SLOW", "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "COWGIRL_SLOW":  { "animation": "animation.ellie.cowgirlslow2", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "COWGIRL_FAST":  { "animation": "animation.ellie.cowgirlfast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "COWGIRL_CUM":   { "animation": "animation.ellie.cowgirlcum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 300, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": true, "group": "Sex", "hidden": false },
 
-    "MISSIONARY_START": { "animation": "animation.ellie.missionary_start", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 64, "locksMovement": true, "followUp": "MISSIONARY_SLOW", "showPartnerRig": true },
-    "MISSIONARY_SLOW":  { "animation": "animation.ellie.missionary_slow",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true },
-    "MISSIONARY_FAST":  { "animation": "animation.ellie.missionary_fast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true },
-    "MISSIONARY_CUM":   { "animation": "animation.ellie.missionary_cum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 280, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": true },
+    "MISSIONARY_START": { "animation": "animation.ellie.missionary_start", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 64, "locksMovement": true, "followUp": "MISSIONARY_SLOW", "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "MISSIONARY_SLOW":  { "animation": "animation.ellie.missionary_slow",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "MISSIONARY_FAST":  { "animation": "animation.ellie.missionary_fast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "MISSIONARY_CUM":   { "animation": "animation.ellie.missionary_cum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 280, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": true, "group": "Sex", "hidden": false },
 
-    "CARRY_INTRO": { "animation": "animation.ellie.carry_intro", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 200, "locksMovement": true, "followUp": "CARRY_SLOW", "showPartnerRig": true },
-    "CARRY_SLOW":  { "animation": "animation.ellie.carry_slow1", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true },
-    "CARRY_FAST":  { "animation": "animation.ellie.carry_fast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true },
-    "CARRY_CUM":   { "animation": "animation.ellie.carry_cum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 100, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": true },
+    "CARRY_INTRO": { "animation": "animation.ellie.carry_intro", "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 200, "locksMovement": true, "followUp": "CARRY_SLOW", "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "CARRY_SLOW":  { "animation": "animation.ellie.carry_slow1", "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "CARRY_FAST":  { "animation": "animation.ellie.carry_fast",  "loopType": "LOOP", "hasPlayer": true, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": true, "group": "Sex", "hidden": false },
+    "CARRY_CUM":   { "animation": "animation.ellie.carry_cum",   "loopType": "PLAY_ONCE", "hasPlayer": true, "durationTicks": 100, "locksMovement": true, "followUp": "IDLE", "showPartnerRig": true, "group": "Sex", "hidden": false },
 
-    "ATTACK0":   { "animation": "animation.ellie.attack0",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
-    "ATTACK1":   { "animation": "animation.ellie.attack1",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
-    "ATTACK2":   { "animation": "animation.ellie.attack2",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
-    "BOWCHARGE": { "animation": "animation.ellie.bowcharge", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 20, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false },
+    "ATTACK0":   { "animation": "animation.ellie.attack0",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false, "group": "Combat", "hidden": true },
+    "ATTACK1":   { "animation": "animation.ellie.attack1",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false, "group": "Combat", "hidden": true },
+    "ATTACK2":   { "animation": "animation.ellie.attack2",   "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 15, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false, "group": "Combat", "hidden": true },
+    "BOWCHARGE": { "animation": "animation.ellie.bowcharge", "loopType": "PLAY_ONCE", "hasPlayer": false, "durationTicks": 20, "locksMovement": false, "followUp": "IDLE", "showPartnerRig": false, "group": "Combat", "hidden": true },
 
-    "DOWNED": { "animation": "animation.ellie.downed", "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false }
+    "DOWNED": { "animation": "animation.ellie.downed", "loopType": "LOOP", "hasPlayer": false, "durationTicks": 0, "locksMovement": true, "followUp": null, "showPartnerRig": false, "group": "Misc", "hidden": false }
   }
 }

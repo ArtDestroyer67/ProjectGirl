@@ -69,6 +69,13 @@ public class StateConfig {
                 boolean isMovement = s.has("isMovement")
                     ? s.get("isMovement").getAsBoolean()
                     : (id.equals("IDLE") || id.equals("WALK"));
+                // Optional, defaults to "Misc" — existing states.json files
+                // won't have this key at all.
+                String group = s.has("group") ? s.get("group").getAsString() : "Misc";
+                // Optional, defaults to false — existing states.json files
+                // won't have this key at all, so nothing is hidden unless
+                // explicitly opted into.
+                boolean hidden = s.has("hidden") && s.get("hidden").getAsBoolean();
 
                 StateDefinition.LoopType loopType;
                 try {
@@ -79,7 +86,7 @@ public class StateConfig {
                     continue;
                 }
 
-                loaded.put(id, new StateDefinition(id, animName, loopType, hasPlayer, duration, locks, followUp, showPartnerRig, isMovement));
+                loaded.put(id, new StateDefinition(id, animName, loopType, hasPlayer, duration, locks, followUp, showPartnerRig, isMovement, group, hidden));
             }
 
             // Validate followUp references point at states that actually exist —
@@ -131,7 +138,7 @@ public class StateConfig {
         if (idle != null) return idle;
         // Truly nothing loaded — return a hardcoded safety net so the game never crashes
         return new StateDefinition("IDLE", "animation.ellie.idle",
-            StateDefinition.LoopType.LOOP, false, 0, false, null, false, true);
+            StateDefinition.LoopType.LOOP, false, 0, false, null, false, true, "Misc", false);
     }
 
     /** All loaded state ids, in the order they appear in the JSON (used to build GUI buttons). */
@@ -141,6 +148,20 @@ public class StateConfig {
 
     public static boolean exists(String id) {
         return STATES.containsKey(id);
+    }
+
+    /**
+     * Distinct groups among states the GUI would ever show (excludes
+     * isMovement and hidden states, same filter GuiGirlInteract itself
+     * applies), in first-seen order — used for the GUI's group filter.
+     */
+    public static List<String> getGroups() {
+        List<String> groups = new ArrayList<>();
+        for (StateDefinition def : STATES.values()) {
+            if (def.isMovement || def.hidden) continue;
+            if (!groups.contains(def.group)) groups.add(def.group);
+        }
+        return groups;
     }
 
     /**
@@ -188,6 +209,6 @@ public class StateConfig {
     private static void loadMinimalFallback() {
         STATES.clear();
         STATES.put("IDLE", new StateDefinition("IDLE", "animation.ellie.idle",
-            StateDefinition.LoopType.LOOP, false, 0, false, null, false, true));
+            StateDefinition.LoopType.LOOP, false, 0, false, null, false, true, "Misc", false));
     }
 }

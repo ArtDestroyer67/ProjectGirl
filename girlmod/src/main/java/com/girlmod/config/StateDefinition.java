@@ -24,11 +24,22 @@ public class StateDefinition {
     // (poses, combat swings, DOWNED) is an "interaction" the GUI can offer,
     // gated on !isMovement — see GuiGirlInteract#buildButtons.
     public final boolean   isMovement;
+    // Category shown as a tab/filter in the GUI (e.g. "Affection", "Sex",
+    // "Combat") — purely organizational, has no effect on gameplay.
+    // Defaults to "Misc" if not specified in states.json.
+    public final String    group;
+    // true = never shown as a button in the GUI, regardless of group —
+    // for states that should only ever be triggered by game logic
+    // (combat swings, DOWNED's mob-matched poses, etc), not picked
+    // manually. Independent of isMovement (which is its own, always-
+    // hidden category); this is a general-purpose hide flag for any state.
+    public final boolean   hidden;
 
     public StateDefinition(String id, String animName, LoopType loopType,
                             boolean hasPlayer, int durationTicks,
                             boolean locksMovement, String followUpId,
-                            boolean showPartnerRig, boolean isMovement) {
+                            boolean showPartnerRig, boolean isMovement,
+                            String group, boolean hidden) {
         this.id             = id;
         this.animName       = animName;
         this.loopType       = loopType;
@@ -38,5 +49,7 @@ public class StateDefinition {
         this.followUpId     = followUpId;
         this.showPartnerRig = showPartnerRig;
         this.isMovement     = isMovement;
+        this.group          = group;
+        this.hidden         = hidden;
     }
 }

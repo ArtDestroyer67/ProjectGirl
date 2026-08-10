@@ -108,6 +108,12 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     // nearby client immediately, no reconnect/relog needed.
     private static final DataParameter<String> SKIN_ID =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
+    // Which AnimationSetConfig entry's .animation.json file supplies her
+    // clips — see GuiGirlInteract's "Anims" list / PacketSetAnimSet.
+    // Independent of SKIN_ID: geo/texture and which animation file the
+    // clip names resolve against are two separate axes.
+    private static final DataParameter<String> ANIMATION_SET_ID =
+        EntityDataManager.defineId(GirlEntity.class, DataSerializers.STRING);
 
     /**
      * Distance an eligible mob must actually close to before the
@@ -237,6 +243,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         this.entityData.define(DOWNED, false);
         this.entityData.define(PARTNER_SKIN_KEY, "");
         this.entityData.define(SKIN_ID, com.girlmod.config.SkinConfig.DEFAULT_SKIN_ID);
+        this.entityData.define(ANIMATION_SET_ID, com.girlmod.config.AnimationSetConfig.DEFAULT_SET_ID);
     }
 
     @Override
@@ -327,6 +334,16 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
     public void setSkinId(String id) {
         this.entityData.set(SKIN_ID, (id == null || !com.girlmod.config.SkinConfig.exists(id))
             ? com.girlmod.config.SkinConfig.DEFAULT_SKIN_ID : id);
+    }
+
+    // ── Animation set ─────────────────────────────────────────────────────────
+
+    /** Id of her currently selected animation set — see AnimationSetConfig. Always resolves to a real entry. */
+    public String getAnimationSetId() { return this.entityData.get(ANIMATION_SET_ID); }
+
+    public void setAnimationSetId(String id) {
+        this.entityData.set(ANIMATION_SET_ID, (id == null || !com.girlmod.config.AnimationSetConfig.exists(id))
+            ? com.girlmod.config.AnimationSetConfig.DEFAULT_SET_ID : id);
     }
 
     private void setPartnerSkinKey(String key) { this.entityData.set(PARTNER_SKIN_KEY, key == null ? "" : key); }
@@ -714,6 +731,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         nbt.putInt("DownedTicks", downedTicks);
         nbt.putString("PartnerSkinKey", getPartnerSkinKey());
         nbt.putString("SkinId", getSkinId());
+        nbt.putString("AnimationSetId", getAnimationSetId());
     }
 
     @Override
@@ -742,6 +760,9 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         }
         if (nbt.contains("SkinId")) {
             setSkinId(nbt.getString("SkinId"));
+        }
+        if (nbt.contains("AnimationSetId")) {
+            setAnimationSetId(nbt.getString("AnimationSetId"));
         }
     }
 

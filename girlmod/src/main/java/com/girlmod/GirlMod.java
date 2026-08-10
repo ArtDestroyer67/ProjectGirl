@@ -3,6 +3,7 @@ package com.girlmod;
 import com.girlmod.client.effect.ClientEffects;
 import com.girlmod.client.gui.GirlContainerScreen;
 import com.girlmod.client.renderer.GirlRenderer;
+import com.girlmod.config.AnimationSetConfig;
 import com.girlmod.config.MobInteractConfig;
 import com.girlmod.config.SkinConfig;
 import com.girlmod.config.StateConfig;
@@ -66,6 +67,7 @@ public class GirlMod {
             SoundMapper.load();
             MobInteractConfig.load();
             SkinConfig.load();
+            AnimationSetConfig.load();
         });
     }
 
@@ -132,9 +134,10 @@ public class GirlMod {
                         SoundMapper.reload();
                         MobInteractConfig.reload();
                         SkinConfig.reload();
+                        AnimationSetConfig.reload();
                         ctx.getSource().sendSuccess(
                             new StringTextComponent(TextFormatting.GREEN
-                                + "[GirlMod] Reloaded states.json, sound_mappings.json, mob_interact.json, and skins.json from config/girlmod/"),
+                                + "[GirlMod] Reloaded states.json, sound_mappings.json, mob_interact.json, skins.json, and animation_sets.json from config/girlmod/"),
                             true
                         );
                         return 1;
