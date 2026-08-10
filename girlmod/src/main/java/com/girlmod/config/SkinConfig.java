@@ -3,6 +3,8 @@ package com.girlmod.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.ResourceLocationException;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -74,13 +76,23 @@ public class SkinConfig {
                     continue;
                 }
 
+                String geoNude    = s.get("geoNude").getAsString();
+                String geoDressed = s.get("geoDressed").getAsString();
+                String texture    = s.get("texture").getAsString();
+
+                // Resource paths must be all-lowercase [a-z0-9/._-] — validate
+                // here at load time (skip the whole skin with a clear log
+                // message) rather than letting a typo crash the game later
+                // during rendering with a much less obvious error.
+                String badPath = firstInvalidPath(geoNude, geoDressed, texture);
+                if (badPath != null) {
+                    System.out.println("[GirlMod] Skin '" + id + "' has an invalid resource path '" + badPath
+                        + "' — resource paths must be lowercase only (a-z, 0-9, /, ., _, -). Skipping this skin.");
+                    continue;
+                }
+
                 String displayName = s.has("displayName") ? s.get("displayName").getAsString() : id;
-                loaded.put(id, new SkinDefinition(
-                    id, displayName,
-                    s.get("geoNude").getAsString(),
-                    s.get("geoDressed").getAsString(),
-                    s.get("texture").getAsString()
-                ));
+                loaded.put(id, new SkinDefinition(id, displayName, geoNude, geoDressed, texture));
             }
         } catch (IOException e) {
             System.out.println("[GirlMod] ERROR reading skins.json: " + e.getMessage());
@@ -110,6 +122,21 @@ public class SkinConfig {
 
     public static boolean exists(String id) {
         return SKINS.containsKey(id);
+    }
+
+    /** Returns the first of the given paths that isn't a valid ResourceLocation path, or null if all are valid. */
+    private static String firstInvalidPath(String... paths) {
+        for (String path : paths) {
+            String bare = path.indexOf(':') >= 0 ? path.substring(path.indexOf(':') + 1) : path;
+            try {
+                // Validating constructor — throws ResourceLocationException on
+                // any character outside [a-z0-9/._-], including uppercase.
+                new ResourceLocation("girlmod", bare);
+            } catch (ResourceLocationException e) {
+                return path;
+            }
+        }
+        return null;
     }
 
     public static Map<String, SkinDefinition> getAll() {

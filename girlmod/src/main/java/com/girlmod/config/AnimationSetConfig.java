@@ -3,6 +3,8 @@ package com.girlmod.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.ResourceLocationException;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -68,8 +70,24 @@ public class AnimationSetConfig {
                     continue;
                 }
 
+                String animationFile = s.get("animationFile").getAsString();
+
+                // Resource paths must be all-lowercase [a-z0-9/._-] — validate
+                // here at load time (skip the whole set with a clear log
+                // message) rather than letting a typo crash the game later
+                // during rendering with a much less obvious error.
+                String bare = animationFile.indexOf(':') >= 0
+                    ? animationFile.substring(animationFile.indexOf(':') + 1) : animationFile;
+                try {
+                    new ResourceLocation("girlmod", bare);
+                } catch (ResourceLocationException e) {
+                    System.out.println("[GirlMod] Animation set '" + id + "' has an invalid resource path '"
+                        + animationFile + "' — resource paths must be lowercase only (a-z, 0-9, /, ., _, -). Skipping this set.");
+                    continue;
+                }
+
                 String displayName = s.has("displayName") ? s.get("displayName").getAsString() : id;
-                loaded.put(id, new AnimationSetDefinition(id, displayName, s.get("animationFile").getAsString()));
+                loaded.put(id, new AnimationSetDefinition(id, displayName, animationFile));
             }
         } catch (IOException e) {
             System.out.println("[GirlMod] ERROR reading animation_sets.json: " + e.getMessage());
