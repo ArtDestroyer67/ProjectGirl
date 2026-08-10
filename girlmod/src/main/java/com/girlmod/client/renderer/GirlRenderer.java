@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.model.ItemCameraTransforms;
 import net.minecraft.inventory.EquipmentSlotType;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.vector.Vector3f;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -22,7 +23,9 @@ import software.bernie.geckolib3.renderers.geo.GeoEntityRenderer;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 @OnlyIn(Dist.CLIENT)
 public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
@@ -80,6 +83,122 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
     // own render() override (which does receive it) for use there.
     private GirlEntity currentEntity;
 
+    // ── Physics-like bone sway (bell, ponytails, boobs, cowtail) ────────────
+    // GeckoLib has no built-in physics simulation for bones — this fakes
+    // convincing sway with a simple damped-spring integration per bone,
+    // chasing a target angle driven by her horizontal speed (rhythmic sway
+    // while moving) and yaw delta (a lag/wobble kick when turning). Applied
+    // in renderEarly() each frame, same technique already used for armor
+    // bone visibility above.
+    //
+    // The renderer instance is shared across every GirlEntity in the
+    // world (Minecraft registers one renderer per entity TYPE, not per
+    // instance), so per-entity physics state (current angle/velocity per
+    // bone) can't live in plain fields here — it's tracked per-entity in
+    // this WeakHashMap instead, which also means entries are automatically
+    // freed once a girl entity is unloaded/removed.
+    private final Map<GirlEntity, SwayState> swayStates = new WeakHashMap<>();
+
+    private static final class SwayState {
+        float prevYaw = Float.NaN;
+        boolean physicsAppliedThisFrame = false;
+        final float[] angle = new float[SWAY_CONFIGS.length];
+        final float[] angVel = new float[SWAY_CONFIGS.length];
+    }
+
+    /** Tune these per bone if the sway looks too stiff/loose/fast — not visually verified, expect to adjust by eye. */
+    private static final class SwayConfig {
+        final String bone;
+        final float stiffness;   // higher = snaps back to rest faster
+        final float damping;     // higher = settles faster, less overshoot/wobble
+        final float moveScale;   // how much horizontal speed contributes to the swing amplitude
+        final float turnScale;   // how much a sudden yaw change "kicks" the bone
+        final float frequency;   // speed of the rhythmic walking-sway oscillation
+        final float phase;       // offset into the oscillation, so paired bones (boobL/R) don't move in perfect lockstep
+        final Axis  axis;        // which local rotation axis the sway is applied to
+
+        SwayConfig(String bone, float stiffness, float damping, float moveScale, float turnScale, float frequency, float phase, Axis axis) {
+            this.bone = bone; this.stiffness = stiffness; this.damping = damping;
+            this.moveScale = moveScale; this.turnScale = turnScale;
+            this.frequency = frequency; this.phase = phase; this.axis = axis;
+        }
+    }
+
+    private enum Axis { X, Y, Z }
+
+    // Axis choice here is a best guess (front-back swing on X, turn-lag
+    // lean on Z) — if a bone sways in the wrong direction in-game, that's
+    // the field to change first.
+    private static final SwayConfig[] SWAY_CONFIGS = {
+        new SwayConfig("bell",      0.35f, 0.35f,  6f, 0.40f, 1.1f, 0.0f, Axis.X),
+        new SwayConfig("ponyTailL", 0.20f, 0.28f, 10f, 0.60f, 0.9f, 0.0f, Axis.Z),
+        new SwayConfig("ponyTailR", 0.20f, 0.28f, 10f, 0.60f, 0.9f, 0.2f, Axis.Z),
+        new SwayConfig("boobL",     0.28f, 0.30f,  5f, 0.30f, 1.6f, 0.0f, Axis.X),
+        new SwayConfig("boobR",     0.28f, 0.30f,  5f, 0.30f, 1.6f, 0.3f, Axis.X),
+        new SwayConfig("cowtail",   0.18f, 0.25f,  8f, 0.50f, 0.8f, 0.0f, Axis.X),
+    };
+
+    // ponyTailL2/R2 share the exact same pivot as ponyTailL/R in the geo
+    // file (a second segment of the same tail), so they just mirror
+    // whatever angle was computed for the primary bone rather than running
+    // their own independent simulation.
+    private static final String[] PONYTAIL_L_FOLLOWERS = { "ponyTailL2" };
+    private static final String[] PONYTAIL_R_FOLLOWERS = { "ponyTailR2" };
+
+    private void applyPhysicsSway(GirlEntity entity) {
+        SwayState state = swayStates.computeIfAbsent(entity, e -> new SwayState());
+        if (state.physicsAppliedThisFrame) return; // already stepped this frame — see render()'s reset
+        state.physicsAppliedThisFrame = true;
+
+        double dx = entity.getX() - entity.xo;
+        double dz = entity.getZ() - entity.zo;
+        float speed = (float) Math.sqrt(dx * dx + dz * dz); // horizontal distance moved since last tick
+
+        float yaw = entity.yBodyRot;
+        float yawDelta = 0f;
+        if (!Float.isNaN(state.prevYaw)) {
+            yawDelta = MathHelper.wrapDegrees(yaw - state.prevYaw);
+        }
+        state.prevYaw = yaw;
+
+        @SuppressWarnings("unchecked")
+        AnimatedGeoModel<GirlEntity> animatedModel = (AnimatedGeoModel<GirlEntity>) this.getGeoModelProvider();
+
+        for (int i = 0; i < SWAY_CONFIGS.length; i++) {
+            SwayConfig cfg = SWAY_CONFIGS[i];
+
+            float oscillation = (float) Math.sin(entity.tickCount * cfg.frequency + cfg.phase) * speed * cfg.moveScale;
+            float turnKick = -yawDelta * cfg.turnScale;
+            float target = oscillation + turnKick;
+
+            float accel = (target - state.angle[i]) * cfg.stiffness - state.angVel[i] * cfg.damping;
+            state.angVel[i] += accel;
+            state.angle[i]  += state.angVel[i];
+
+            IBone bone = animatedModel.getAnimationProcessor().getBone(cfg.bone);
+            setSwayAxis(bone, cfg.axis, state.angle[i]);
+
+            if (cfg.bone.equals("ponyTailL")) {
+                for (String follower : PONYTAIL_L_FOLLOWERS) {
+                    setSwayAxis(animatedModel.getAnimationProcessor().getBone(follower), cfg.axis, state.angle[i]);
+                }
+            } else if (cfg.bone.equals("ponyTailR")) {
+                for (String follower : PONYTAIL_R_FOLLOWERS) {
+                    setSwayAxis(animatedModel.getAnimationProcessor().getBone(follower), cfg.axis, state.angle[i]);
+                }
+            }
+        }
+    }
+
+    private static void setSwayAxis(IBone bone, Axis axis, float degrees) {
+        if (bone == null) return;
+        switch (axis) {
+            case X: bone.setRotationX(degrees); break;
+            case Y: bone.setRotationY(degrees); break;
+            case Z: bone.setRotationZ(degrees); break;
+        }
+    }
+
     public GirlRenderer(EntityRendererManager manager) {
         this(manager, new GirlModel());
     }
@@ -126,6 +245,7 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
                         int packedLightIn) {
 
         this.currentEntity = entity; // see field comment — needed by renderRecursively()
+        swayStates.computeIfAbsent(entity, e -> new SwayState()).physicsAppliedThisFrame = false;
 
         @SuppressWarnings("unchecked")
         AnimatedGeoModel<GirlEntity> animatedModel =
@@ -190,6 +310,8 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
                           packedLightIn, packedOverlayIn, red, green, blue, alpha);
 
         this.rtb = renderTypeBuffer; // needed by renderRecursively() below to draw the held weapon
+
+        applyPhysicsSway(entity); // bell/ponytails/boobs/cowtail — exists on both geo files, so before the isDressed() gate below
 
         // Only applies to the dressed model — nude model has no armor bones
         if (!entity.isDressed()) return;
