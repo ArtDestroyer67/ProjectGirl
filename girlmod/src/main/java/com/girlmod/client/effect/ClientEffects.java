@@ -72,19 +72,20 @@ public class ClientEffects {
 
     // ── Heart particles ──────────────────────────────────────────────────────
 
-    /** Spawns a small burst of vanilla heart particles above the given position — see GirlEntity#onSoundKeyframe. */
+    /** Spawns a burst of vanilla heart particles at the given position (call with her eye/head height) — see GirlEntity#onSoundKeyframe. */
     public static void spawnHearts(net.minecraft.world.World world, double x, double y, double z) {
         if (!(world instanceof net.minecraft.client.world.ClientWorld)) return; // client-local visual only, never networked
         net.minecraft.client.world.ClientWorld clientWorld = (net.minecraft.client.world.ClientWorld) world;
         java.util.Random rand = world.random;
-        int count = 2 + rand.nextInt(2); // 2-3 hearts per trigger
+        int count = 6 + rand.nextInt(3); // 6-8 hearts, a proper burst rather than a trickle
         for (int i = 0; i < count; i++) {
-            double ox = (rand.nextDouble() - 0.5) * 0.6;
-            double oz = (rand.nextDouble() - 0.5) * 0.6;
+            double ox = (rand.nextDouble() - 0.5) * 0.8;
+            double oy = (rand.nextDouble() - 0.5) * 0.3;
+            double oz = (rand.nextDouble() - 0.5) * 0.8;
             clientWorld.addParticle(
                 net.minecraft.particles.ParticleTypes.HEART,
-                x + ox, y + rand.nextDouble() * 0.3, z + oz,
-                0.0, 0.05, 0.0
+                x + ox, y + oy, z + oz,
+                ox * 0.3, 0.15 + rand.nextDouble() * 0.15, oz * 0.3 // pop outward and up, like vanilla breeding hearts
             );
         }
     }

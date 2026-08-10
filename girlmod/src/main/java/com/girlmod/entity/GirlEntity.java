@@ -767,7 +767,7 @@ public class GirlEntity extends CreatureEntity implements IAnimatable, INamedCon
         // existing keyframe dispatch rather than needing dedicated "heart"
         // keyframes added to every animation.
         if (getStateDef().hasPlayer) {
-            ClientEffects.spawnHearts(this.level, this.getX(), this.getY() + 1.6, this.getZ());
+            ClientEffects.spawnHearts(this.level, this.getX(), this.getEyeY(), this.getZ());
         }
 
         this.level.playLocalSound(
