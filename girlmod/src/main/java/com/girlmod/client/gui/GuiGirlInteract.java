@@ -4,6 +4,7 @@ import com.girlmod.config.StateConfig;
 import com.girlmod.config.StateDefinition;
 import com.girlmod.entity.GirlEntity;
 import com.girlmod.network.PacketHandler;
+import com.girlmod.network.PacketOpenInventory;
 import com.girlmod.network.PacketRecover;
 import com.girlmod.network.PacketSetFlag;
 import com.girlmod.network.PacketSetState;
@@ -72,9 +73,8 @@ public class GuiGirlInteract extends Screen {
         // ── Toggle row ────────────────────────────────────────────────────
         int cx = this.width / 2;
 
-        // How many toggles? Follow + Dress + Partner + (Armor if dressed) = 3 or 4
-        boolean showArmor = entity.isDressed();
-        int toggleCount   = showArmor ? 4 : 3;
+        // Toggles: Follow + Dress + Partner + Inventory = always 4
+        int toggleCount   = 4;
         int totalToggleW  = toggleCount * BTN_W + (toggleCount - 1) * 6;
         int toggleStartX  = cx - totalToggleW / 2;
 
@@ -84,10 +84,8 @@ public class GuiGirlInteract extends Screen {
         addDressBtn(toggleStartX + BTN_W + 6, TOGGLE_Y);
         // Partner rig toggle (force-show steve for testing, independent of pose)
         addPartnerBtn(toggleStartX + (BTN_W + 6) * 2, TOGGLE_Y);
-        // Armor toggle (only when dressed)
-        if (showArmor) {
-            addArmorBtn(toggleStartX + (BTN_W + 6) * 3, TOGGLE_Y);
-        }
+        // Inventory — opens the real armor/item equip screen (GirlContainer)
+        addInventoryBtn(toggleStartX + (BTN_W + 6) * 3, TOGGLE_Y);
 
         // ── Pose buttons, paginated (or a Recover button while downed) ─────
         // Pose picking is hidden entirely while downed — she stays downed
@@ -177,15 +175,12 @@ public class GuiGirlInteract extends Screen {
         ));
     }
 
-    private void addArmorBtn(int x, int y) {
-        boolean armored = entity.isArmored();
+    private void addInventoryBtn(int x, int y) {
         this.addButton(new Button(x, y, BTN_W, BTN_H,
-            new StringTextComponent(armored ? "Armor: ON" : "Armor: OFF"),
+            new StringTextComponent("Inventory"),
             btn -> {
-                PacketHandler.CHANNEL.sendToServer(
-                    new PacketSetFlag(entity.getId(), PacketSetFlag.FLAG_ARMOR, !armored));
-                // Rebuild in place so the button label updates immediately
-                init();
+                PacketHandler.CHANNEL.sendToServer(new PacketOpenInventory(entity.getId()));
+                this.onClose();
             }
         ));
     }
@@ -242,7 +237,7 @@ public class GuiGirlInteract extends Screen {
         String status = "State: " + prettyName(entity.getStateId())
             + (entity.isFollowing() ? "  |  Following"  : "")
             + (entity.isDressed()   ? "  |  Dressed"    : "  |  Nude")
-            + (entity.isDressed()   ? (entity.isArmored() ? "  |  Armored" : "  |  No Armor") : "")
+            + (entity.hasAnyArmorEquipped() ? "  |  Armored" : "")
             + (entity.isPartnerForced() ? "  |  Partner Forced" : "");
         drawCenteredString(stack, this.font, status, this.width / 2, 22, 0xFFFFFFFF);
 

@@ -5,6 +5,7 @@ import com.girlmod.config.StateDefinition;
 import com.girlmod.entity.goal.CustomBowAttackGoal;
 import com.girlmod.entity.goal.FollowPlayerGoal;
 import com.girlmod.entity.goal.IdleGatedGoal;
+import com.girlmod.inventory.GirlContainer;
 import com.girlmod.sound.SoundMapper;
 import net.minecraft.entity.CreatureEntity;
 import net.minecraft.entity.Entity;
@@ -21,8 +22,12 @@ import net.minecraft.entity.ai.goal.RandomWalkingGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
 import net.minecraft.entity.monster.MonsterEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.inventory.EquipmentSlotType;
+import net.minecraft.inventory.container.Container;
+import net.minecraft.inventory.container.INamedContainerProvider;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SwordItem;
@@ -37,9 +42,11 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.SoundEvents;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.fml.network.NetworkHooks;
 import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib3.core.IAnimatable;
 import software.bernie.geckolib3.core.PlayState;
@@ -50,6 +57,7 @@ import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Random;
 
@@ -72,7 +80,7 @@ import java.util.Random;
  * following, combat) runs while a locksMovement pose from states.json
  * is playing.
  */
-public class GirlEntity extends CreatureEntity implements IAnimatable {
+public class GirlEntity extends CreatureEntity implements IAnimatable, INamedContainerProvider {
 
     public static final String DEFAULT_STATE_ID = "IDLE";
 
@@ -81,8 +89,6 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     private static final DataParameter<Boolean> FOLLOWING =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> DRESSED   =
-        EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
-    private static final DataParameter<Boolean> ARMORED   =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
     private static final DataParameter<Boolean> PARTNER_FORCED =
         EntityDataManager.defineId(GirlEntity.class, DataSerializers.BOOLEAN);
@@ -207,7 +213,6 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         this.entityData.define(STATE, DEFAULT_STATE_ID);
         this.entityData.define(FOLLOWING, false);
         this.entityData.define(DRESSED, false);
-        this.entityData.define(ARMORED, false);
         this.entityData.define(PARTNER_FORCED, false);
         this.entityData.define(DOWNED, false);
         this.entityData.define(PARTNER_SKIN_KEY, "");
@@ -240,12 +245,33 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
     }
 
     // ── Armor ─────────────────────────────────────────────────────────────────
+    // Real equipment now, via LivingEntity's own HEAD/CHEST/LEGS/FEET slots
+    // (same mechanism already used for mainhand weapons in mobInteract) —
+    // see GirlContainer for the inventory screen that lets a player equip
+    // these, and GirlRenderer for how hasAnyArmorEquipped() drives the
+    // armor bones' visibility on the dressed model.
 
-    /** True = armor bones visible on the dressed model. See GirlRenderer.ARMOR_BONES. */
-    public boolean isArmored() { return this.entityData.get(ARMORED); }
+    public boolean hasAnyArmorEquipped() {
+        return !getItemBySlot(EquipmentSlotType.HEAD).isEmpty()
+            || !getItemBySlot(EquipmentSlotType.CHEST).isEmpty()
+            || !getItemBySlot(EquipmentSlotType.LEGS).isEmpty()
+            || !getItemBySlot(EquipmentSlotType.FEET).isEmpty();
+    }
 
-    public void setArmored(boolean armored) {
-        this.entityData.set(ARMORED, armored);
+    /** Opens the armor/inventory screen (reuses the vanilla player-inventory UI) for the given player. Server-side only. */
+    public void openArmorInventory(ServerPlayerEntity player) {
+        NetworkHooks.openGui(player, this, buf -> buf.writeInt(this.getId()));
+    }
+
+    @Override
+    public ITextComponent getDisplayName() {
+        return this.getName();
+    }
+
+    @Nullable
+    @Override
+    public Container createMenu(int windowId, PlayerInventory playerInventory, PlayerEntity player) {
+        return new GirlContainer(windowId, playerInventory, this);
     }
 
     // ── Partner rig test override ────────────────────────────────────────────
@@ -624,7 +650,6 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         nbt.putString("GirlState", getStateId());
         nbt.putBoolean("Following", isFollowing());
         nbt.putBoolean("Dressed", isDressed());
-        nbt.putBoolean("Armored", isArmored());
         nbt.putBoolean("PartnerForced", isPartnerForced());
         nbt.putBoolean("Downed", isDowned());
         nbt.putInt("DownedTicks", downedTicks);
@@ -642,9 +667,6 @@ public class GirlEntity extends CreatureEntity implements IAnimatable {
         }
         if (nbt.contains("Dressed")) {
             setDressed(nbt.getBoolean("Dressed"));
-        }
-        if (nbt.contains("Armored")) {
-            setArmored(nbt.getBoolean("Armored"));
         }
         if (nbt.contains("PartnerForced")) {
             setPartnerForced(nbt.getBoolean("PartnerForced"));

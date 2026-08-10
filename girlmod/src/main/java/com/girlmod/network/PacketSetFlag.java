@@ -13,7 +13,6 @@ public class PacketSetFlag {
 
     public static final String FLAG_FOLLOWING = "FOLLOWING";
     public static final String FLAG_DRESSED   = "DRESSED";
-    public static final String FLAG_ARMOR     = "ARMOR";   // NEW: toggle armor pieces on dressed model
     public static final String FLAG_PARTNER   = "PARTNER"; // NEW: force-show the steve partner rig for testing
 
     private final int     entityId;
@@ -51,7 +50,6 @@ public class PacketSetFlag {
             switch (msg.flag) {
                 case FLAG_FOLLOWING: girl.setFollowing(msg.value); break;
                 case FLAG_DRESSED:   girl.setDressed(msg.value);   break;
-                case FLAG_ARMOR:     girl.setArmored(msg.value);   break;  // NEW
                 case FLAG_PARTNER:   girl.setPartnerForced(msg.value); break; // NEW
                 default:
                     System.out.println("[GirlMod] Unknown flag in PacketSetFlag: " + msg.flag);

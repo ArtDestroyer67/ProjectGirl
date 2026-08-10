@@ -40,5 +40,12 @@ public class PacketHandler {
             PacketRecover::decode,
             PacketRecover::handle
         );
+        CHANNEL.registerMessage(
+            id++,
+            PacketOpenInventory.class,
+            PacketOpenInventory::encode,
+            PacketOpenInventory::decode,
+            PacketOpenInventory::handle
+        );
     }
 }

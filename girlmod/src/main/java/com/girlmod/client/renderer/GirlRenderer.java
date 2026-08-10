@@ -31,7 +31,7 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
 
     /**
      * All bone names in girl_dressed.geo.json that are part of the armor.
-     * When isArmored() is false these bones are scaled to 0 so they vanish
+     * When hasAnyArmorEquipped() is false these bones are scaled to 0 so they vanish
      * without needing a separate geo file.
      */
     private static final Set<String> ARMOR_BONES = new HashSet<>(Arrays.asList(
@@ -147,7 +147,8 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
 
     /**
      * Called by GeckoLib just before the model is rendered each frame.
-     * We use it to toggle armor bone visibility based on entity.isArmored().
+     * We use it to toggle armor bone visibility based on entity.hasAnyArmorEquipped()
+     * — real equipment now (HEAD/CHEST/LEGS/FEET slots), not a manual toggle.
      * Scaling to 0 is the standard GeckoLib way to hide bones at runtime
      * without modifying the geo file.
      */
@@ -164,7 +165,7 @@ public class GirlRenderer extends GeoEntityRenderer<GirlEntity> {
         // Only applies to the dressed model — nude model has no armor bones
         if (!entity.isDressed()) return;
 
-        boolean showArmor = entity.isArmored();
+        boolean showArmor = entity.hasAnyArmorEquipped();
 
         // getGeoModelProvider() is statically typed to the bare GeoModelProvider<T>
         // base class, which has no animation-related methods at all — the actual

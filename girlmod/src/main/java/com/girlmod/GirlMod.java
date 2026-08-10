@@ -1,13 +1,16 @@
 package com.girlmod;
 
+import com.girlmod.client.gui.GirlContainerScreen;
 import com.girlmod.client.renderer.GirlRenderer;
 import com.girlmod.config.StateConfig;
 import com.girlmod.entity.GirlEntity;
+import com.girlmod.init.ModContainers;
 import com.girlmod.init.ModEntities;
 import com.girlmod.init.ModSounds;
 import com.girlmod.network.PacketHandler;
 import com.girlmod.sound.SoundMapper;
 import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.client.gui.ScreenManager;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.Commands;
 import net.minecraft.entity.SpawnReason;
@@ -42,6 +45,7 @@ public class GirlMod {
 
         ModEntities.ENTITY_TYPES.register(modBus);
         ModSounds.SOUNDS.register(modBus);
+        ModContainers.CONTAINERS.register(modBus);
 
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::clientSetup);
@@ -65,6 +69,9 @@ public class GirlMod {
         RenderingRegistry.registerEntityRenderingHandler(
             ModEntities.GIRL.get(),
             manager -> new GirlRenderer(manager)
+        );
+        event.enqueueWork(() ->
+            ScreenManager.register(ModContainers.GIRL_CONTAINER.get(), GirlContainerScreen::new)
         );
     }
 
