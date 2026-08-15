@@ -1,0 +1,30 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "girlmod:girl",
+      "materials": { "default": "entity_alphatest" },
+      "textures": {
+        "default": "textures/entity/girl/girl"
+      },
+      "geometry": {
+        "default": "geometry.ellie"
+      },
+      "animations": {
+        "idle": "animation.ellie.idle",
+        "walk": "animation.ellie.walk",
+        "hug": "animation.ellie.hug",
+        "sit": "animation.ellie.sit",
+        "main_controller": "controller.animation.girl.main"
+      },
+      "scripts": {
+        "animate": ["main_controller"]
+      },
+      "render_controllers": ["controller.render.girl"],
+      "spawn_egg": {
+        "base_color": "#ff9ec4",
+        "overlay_color": "#3a2a20"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "GirlMod (Bedrock, private)",
+    "description": "Private-use Bedrock port of the GirlMod companion entity. Core behavior only \u2014 no GUI/inventory (not possible on Bedrock without a much larger scripting build).",
+    "uuid": "75c2a0aa-681d-46fd-bdfa-3f30493d7c24",
+    "version": [0, 1, 0],
+    "min_engine_version": [1, 21, 70]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "3804cc78-e6bd-4db6-ae4a-feb1798d5724",
+      "version": [0, 1, 0]
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "634412a7-ba53-49ba-842f-32f3418cd5be",
+      "version": [0, 1, 0]
+    }
+  ]
+}

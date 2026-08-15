@@ -1,0 +1,55 @@
+{
+  "format_version": "1.21.70",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "girlmod:girl",
+      "is_spawnable": true,
+      "is_summonable": true,
+      "is_experimental": false,
+
+      "properties": {
+        "girlmod:pose": {
+          "type": "enum",
+          "values": ["idle", "walk", "hug", "sit"],
+          "default": "idle",
+          "client_sync": true
+        }
+      }
+    },
+
+    "components": {
+      "minecraft:type_family": { "family": ["girlmod_girl"] },
+      "minecraft:health": { "value": 20, "max": 20 },
+      "minecraft:collision_box": { "width": 0.6, "height": 1.8 },
+      "minecraft:movement": { "value": 0.25 },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "can_path_over_water": true,
+        "avoid_water": true,
+        "avoid_damage_blocks": true
+      },
+      "minecraft:jump.static": {},
+      "minecraft:physics": {},
+      "minecraft:pushable": { "is_pushable": true, "is_pushable_by_piston": true },
+
+      "minecraft:behavior.float": { "priority": 0 },
+      "minecraft:behavior.look_at_player": {
+        "priority": 8,
+        "look_distance": 8.0,
+        "probability": 0.02
+      },
+      "minecraft:behavior.random_look_around": { "priority": 9 },
+      "minecraft:behavior.random_stroll": {
+        "priority": 7,
+        "speed_multiplier": 1.0
+      }
+    },
+
+    "events": {
+      "girlmod:set_pose_idle": { "set_property": { "girlmod:pose": "idle" } },
+      "girlmod:set_pose_walk": { "set_property": { "girlmod:pose": "walk" } },
+      "girlmod:set_pose_hug":  { "set_property": { "girlmod:pose": "hug" } },
+      "girlmod:set_pose_sit":  { "set_property": { "girlmod:pose": "sit" } }
+    }
+  }
+}

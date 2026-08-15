@@ -1,0 +1,32 @@
+{
+  "format_version": "1.10.0",
+  "animation_controllers": {
+    "controller.animation.girl.main": {
+      "initial_state": "idle_walk",
+      "states": {
+        "idle_walk": {
+          "animations": [
+            { "idle": "!query.is_moving" },
+            { "walk": "query.is_moving" }
+          ],
+          "transitions": [
+            { "hug": "query.property('girlmod:pose') == 'hug'" },
+            { "sit": "query.property('girlmod:pose') == 'sit'" }
+          ]
+        },
+        "hug": {
+          "animations": ["hug"],
+          "transitions": [
+            { "idle_walk": "query.property('girlmod:pose') != 'hug'" }
+          ]
+        },
+        "sit": {
+          "animations": ["sit"],
+          "transitions": [
+            { "idle_walk": "query.property('girlmod:pose') != 'sit'" }
+          ]
+        }
+      }
+    }
+  }
+}
